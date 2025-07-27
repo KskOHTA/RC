@@ -452,12 +452,14 @@
 
                 // 既にリストに似たクォータニオンが存在しないかチェック (浮動小数点誤差を考慮)
                 let isDuplicate = false;
-                for (const existingQ of SNAP_QUATERNIONS) {
-                     if (existingQ.angleTo(q) < 0.001 || existingQ.angleTo(q.clone().negate()) < 0.001) { // 逆向きも同一とみなす
-                         isDuplicate = true;
-                         break;
-                     }
+                // --- 修正箇所: negate() の呼び出し方法を変更 ---
+                const qNegated = q.clone();
+                qNegated.negate();
+                if (existingQ.angleTo(q) < 0.001 || existingQ.angleTo(qNegated) < 0.001) {
+                    isDuplicate = true;
+                    break;
                 }
+                // --- 修正箇所ここまで ---
                 if (!isDuplicate) {
                     SNAP_QUATERNIONS.push(q);
                 }
@@ -714,18 +716,6 @@
 
                 case '8-4': return '8-6';
                 case '4-2': return '2-4';
-                case '2-6': return '2-6'; // No, should be 2-6 -> 6-2 for inverse
-                case '6-8': return '4-8'; // No, should be 6-8 -> 8-4 for inverse
-
-                // Corrected inverse for whole cube Z-axis rotations
-                case '8-6': return '8-4'; // Z-axis clockwise -> Z-axis counter-clockwise
-                case '6-2': return '2-6';
-                case '2-4': return '4-2';
-                case '4-8': return '6-8';
-
-                // Corrected inverse for whole cube Z-axis rotations
-                case '8-4': return '8-6'; // Z-axis counter-clockwise -> Z-axis clockwise
-                case '4-2': return '2-4';
                 case '2-6': return '6-2';
                 case '6-8': return '4-8';
 
@@ -908,6 +898,7 @@
                 console.log(`${colorsArr[6]}${colorsArr[7]}${colorsArr[8]}`);
             };
 
+            // ルービックキューブの標準的な配置順で各面を出力
             printFace('Top (White)', faceStates.Top);
             printFace('Left (Red)', faceStates.Left);
             printFace('Front (Blue)', faceStates.Front);
