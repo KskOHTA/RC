@@ -528,7 +528,7 @@
         function getReverseOperation(operation) {
             switch (operation) {
                 // 面の回転
-                case '9-9': 
+                case '9-9':
                 case '3-9': return '3-3'; // 9-9, 3-9 の逆は 3-3, 9-3
                 case '3-3':
                 case '9-3': return '9-9'; // 3-3, 9-3 の逆は 9-9, 3-9
@@ -544,38 +544,38 @@
                 case '3-1': return '1-3';
 
                 // キューブ全体の回転
-                case '5-2': return '5-8';
-                case '5-8': return '5-2';
-                case '8-5': return '2-5'; // 8-5と2-5は同じ意味なので逆は互いに
-                case '2-5': return '8-5';
-                case '5-4': return '5-6';
-                case '5-6': return '5-4';
-                case '6-5': return '4-5'; // 6-5と4-5は同じ意味なので逆は互いに
-                case '4-5': return '6-5';
-                case '8-6': return '8-4';
-                case '8-4': return '8-6';
-                case '6-2': return '4-8'; // 同上
-                case '2-4': return '6-2';
-                case '4-8': return '2-4';
-                case '2-6': return '4-2'; // 同上
-                case '4-2': return '2-6';
-                case '6-8': return '2-6'; // 同上
+                case '5-2':
+                case '8-5': return '5-8'; // 5-2, 8-5 の逆は 5-8, 2-5
+                case '5-8':
+                case '2-5': return '5-2'; // 5-8, 2-5 の逆は 5-2, 8-5
+                case '5-4':
+                case '6-5': return '5-6'; // 5-4, 6-5 の逆は 5-6, 4-5
+                case '5-6':
+                case '4-5': return '5-4'; // 5-6, 4-5 の逆は 5-4, 6-5
+                case '8-6':
+                case '6-2':
+                case '2-4':
+                case '4-8': return '8-4'; // 8-6, 6-2, 2-4, 4-8 の逆は 8-4, 4-2, 2-6, 6-8
+                case '8-4':
+                case '4-2':
+                case '2-6':
+                case '6-8': return '8-6'; // 8-4, 4-2, 2-6, 6-8 の逆は 8-6, 6-2, 2-4, 4-8
 
                 // 中央列の回転
-                case '8-8': return '8-2';
-                case '2-8': return '2-2';
-                case '8-2': return '8-8';
-                case '2-2': return '2-8';
-                case '6-6': return '4-4';
-                case '4-6': return '6-4';
-                case '4-4': return '6-6';
-                case '6-4': return '4-6';
+                case '8-8':
+                case '2-8': return '8-2'; // 8-8, 2-8 の逆は 8-2, 2-2
+                case '8-2':
+                case '2-2': return '8-8'; // 8-2, 2-2 の逆は 8-8, 2-8
+                case '6-6':
+                case '4-6': return '4-4'; // 6-6, 4-6 の逆は 4-4, 6-4
+                case '4-4':
+                case '6-4': return '6-6'; // 4-4, 6-4 の逆は 6-6, 4-6
                 case '5-7': return '5-1';
                 case '5-1': return '5-7';
                 default: return null;
             }
         }
-
+        
         // --- アニメーションループ ---
         function animate() {
             requestAnimationFrame(animate); // 次のフレームで再度この関数を呼び出す
