@@ -16,6 +16,7 @@
 
         canvas {
             display: block;
+            touch-action: none; /* タッチジェスチャーによるブラウザのスクロールなどを無効化 */
         }
 
         #info {
@@ -42,50 +43,90 @@
         #info li {
             margin-bottom: 5px;
         }
+
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            z-index: 10;
+            display: flex;
+            gap: 10px; /* ボタン間の隙間 */
+        }
+
+        #controls button {
+            padding: 10px 15px;
+            font-size: 1em;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #controls button:hover {
+            background-color: #0056b3;
+        }
+
+        #controls button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
     <div id="info">
-        <h1>Rubik's Cube Simulator</h1>
         <details>
-            <summary>操作説明 (テンキー):</summary>
-        <p>テンキーで操作してください:</p>
-        <ul>
-            <li><b>9-9, 3-9</b>: Right面 90度時計回転</li>
-            <li><b>3-3, 9-3</b>: Right面 90度反時計回転</li>
-            <li><b>7-8, 8-9, 9-6, 6-3, 3-2, 2-1, 1-4, 4-7</b>: Front面 90度時計回転</li>
-            <li><b>9-8, 8-7, 7-4, 4-1, 1-2, 2-3, 3-6, 6-9</b>: Front面 90度反時計回転</li>
-            <li><b>7-9</b>: Top面 90度時計回転</li>
-            <li><b>9-7</b>: Top面 90度反時計回転</li>
-            <li><b>7-7, 1-7</b>: Left面 90度時計回転</li>
-            <li><b>1-1, 7-1</b>: Left面 90度反時計回転</li>
-            <li><b>1-3</b>: Bottom面 90度時計回転</li>
-            <li><b>3-1</b>: Bottom面 90度反時計回転</li>
-            <li><b>5-2, 8-5</b>: キューブ全体をX軸正方向へ90度回転</li>
-            <li><b>5-8, 2-5</b>: キューブ全体をX軸正方向へ-90度回転</li>
-            <li><b>5-4, 6-5</b>: キューブ全体をY軸正方向へ-90度回転</li>
-            <li><b>5-6, 4-5</b>: キューブ全体をY軸正方向へ90度回転</li>
-            <li><b>8-6, 6-2, 2-4, 4-8</b>: キューブ全体をZ軸正方向へ-90度回転</li>
-            <li><b>8-4, 4-2, 2-6, 6-8</b>: キューブ全体をZ軸正方向へ90度回転</li>
-            <li><b>8-8, 2-8</b>: 中央X列 (X=0) を時計回転</li>
-            <li><b>8-2, 2-2</b>: 中央X列 (X=0) を反時計回転</li>
-            <li><b>6-6, 4-6</b>: 中央Y列 (Y=0) を時計回転</li>
-            <li><b>4-4, 6-4</b>: 中央Y列 (Y=0) を反時計回転</li>
-            <li><b>5-7</b>: 中央Z列 (Z=0) を時計回転</li>
-            <li><b>5-1</b>: 中央Z列 (Z=0) を反時計回転</li>
-            <li><b>5-5</b>: カメラ視点をTop, Front, RightとTop, Front, Leftで切り替え (アニメーション)</li>
-            <li><b>0-1</b>: **キューブをシャッフル** (アニメーション付き)</li>
-            <li><b>0-0</b>: **アンドゥ** (直前の操作を取り消す)</li>
-            <li><b>0-2</b>: **キューブの状態をコンソールに出力**</li>
-        </ul>
+            <summary><h1>Rubik's Cube Simulator 操作説明</h1></summary>
+            <p>テンキーで操作してください:</p>
+            <ul>
+                <li><b>9-9, 3-9</b>: Right面 90度時計回転</li>
+                <li><b>3-3, 9-3</b>: Right面 90度反時計回転</li>
+                <li><b>7-8, 8-9, 9-6, 6-3, 3-2, 2-1, 1-4, 4-7</b>: Front面 90度時計回転</li>
+                <li><b>9-8, 8-7, 7-4, 4-1, 1-2, 2-3, 3-6, 6-9</b>: Front面 90度反時計回転</li>
+                <li><b>7-9</b>: Top面 90度時計回転</li>
+                <li><b>9-7</b>: Top面 90度反時計回転</li>
+                <li><b>7-7, 1-7</b>: Left面 90度時計回転</li>
+                <li><b>1-1, 7-1</b>: Left面 90度反時計回転</li>
+                <li><b>1-3</b>: Bottom面 90度時計回転</li>
+                <li><b>3-1</b>: Bottom面 90度反時計回転</li>
+                <li><b>5-2, 8-5</b>: キューブ全体をX軸正方向へ90度回転</li>
+                <li><b>5-8, 2-5</b>: キューブ全体をX軸正方向へ-90度回転</li>
+                <li><b>5-4, 6-5</b>: キューブ全体をY軸正方向へ-90度回転</li>
+                <li><b>5-6, 4-5</b>: キューブ全体をY軸正方向へ90度回転</li>
+                <li><b>8-6, 6-2, 2-4, 4-8</b>: キューブ全体をZ軸正方向へ-90度回転</li>
+                <li><b>8-4, 4-2, 2-6, 6-8</b>: キューブ全体をZ軸正方向へ90度回転</li>
+                <li><b>8-8, 2-8</b>: 中央X列 (X=0) を時計回転</li>
+                <li><b>8-2, 2-2</b>: 中央X列 (X=0) を反時計回転</li>
+                <li><b>6-6, 4-6</b>: 中央Y列 (Y=0) を時計回転</li>
+                <li><b>4-4, 6-4</b>: 中央Y列 (Y=0) を反時計回転</li>
+                <li><b>5-7</b>: 中央Z列 (Z=0) を時計回転</li>
+                <li><b>5-1</b>: 中央Z列 (Z=0) を反時計回転</li>
+                <li><b>5-5</b>: カメラ視点をTop, Front, RightとTop, Front, Leftで切り替え (アニメーション)</li>
+                <li><b>0-1</b>: **キューブをシャッフル** (アニメーション付き)</li>
+                <li><b>0-0</b>: **アンドゥ** (直前の操作を取り消す)</li>
+                <li><b>0-2</b>: **キューブの状態をコンソールに出力**</li>
+            </ul>
+            <p>※連続してキーを入力してください。</p>
+            <p><b>タッチ操作（スワイプ）によるテンキー入力の再現:</b></p>
+            <ul>
+                <li>画面全体がテンキーの 7 8 9 / 4 5 6 / 1 2 3 に対応します。</li>
+                <li>タッチ開始位置の数字と、スワイプ終了位置の数字を組み合わせることで、テンキー入力と同様の操作が可能です。</li>
+                <li>例: 画面左上（7のエリア）でタッチ開始し、中央上（8のエリア）へスワイプすると「7-8」の操作になります。</li>
+            </ul>
         </details>
-        <p>※連続してキーを入力してください。</p>
-        <p><b>タッチ操作（スワイプ）によるキューブ全体の回転:</b></p>
-        <ul>
-            <li><b>左右スワイプ:</b> キューブ全体をY軸周りに回転</li>
-            <li><b>上下スワイプ:</b> キューブ全体をX軸周りに回転</li>
-        </ul>
     </div>
+
+    <div id="controls">
+        <button id="shuffleButton">シャッフル</button>
+        <button id="undoButton">アンドゥ</button>
+        <button id="logStateButton">状態出力</button>
+        <button id="cameraViewButton">視点切り替え</button>
+    </div>
+
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
     <script>
         // --- シーンの初期設定 ---
@@ -174,7 +215,7 @@
                 } else {
                     // 2回目の入力。2ストローク操作を実行
                     const operation = firstKey + '-' + key;
-                    console.log("Operation:", operation);
+                    console.log("Operation (Key):", operation);
 
                     if (operation === '0-2') { // キューブ状態出力 (変更箇所)
                         logCubeState();
@@ -201,51 +242,80 @@
         // --- タッチ操作処理 ---
         let touchStartX = 0;
         let touchStartY = 0;
+        let startNumpad = null;
         let touchMoved = false;
-        const SWIPE_THRESHOLD = 30; // スワイプと認識する最低距離（ピクセル）
+        const SWIPE_THRESHOLD = 20; // スワイプと認識する最低距離（ピクセル）
+
+        // 画面座標からテンキーの数字 (1-9) を取得する関数
+        function getNumpadFromScreenCoords(clientX, clientY) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const x = clientX - rect.left;
+            const y = clientY - rect.top;
+
+            const colWidth = rect.width / 3;
+            const rowHeight = rect.height / 3;
+
+            const col = Math.floor(x / colWidth);
+            const row = Math.floor(y / rowHeight);
+
+            // テンキーの配置 (7 8 9 / 4 5 6 / 1 2 3) にマッピング
+            if (row >= 0 && row <= 2 && col >= 0 && col <= 2) {
+                // row 0: 7, 8, 9
+                // row 1: 4, 5, 6
+                // row 2: 1, 2, 3
+                return (2 - row) * 3 + (col + 1);
+            }
+            return null; // 有効な範囲外
+        }
+
 
         renderer.domElement.addEventListener('touchstart', (event) => {
             if (isRotating || isCameraAnimating || isShuffling || isUndoing) return;
             touchStartX = event.touches[0].clientX;
             touchStartY = event.touches[0].clientY;
+            startNumpad = getNumpadFromScreenCoords(touchStartX, touchStartY);
             touchMoved = false;
+            event.preventDefault(); // スクロールを防ぐ
         });
 
         renderer.domElement.addEventListener('touchmove', (event) => {
-            // スクロールを防ぐ
-            event.preventDefault();
+            event.preventDefault(); // スクロールを防ぐ
             touchMoved = true;
         });
 
         renderer.domElement.addEventListener('touchend', (event) => {
-            if (isRotating || isCameraAnimating || isShuffling || isUndoing || !touchMoved) return;
-
+            if (isRotating || isCameraAnimating || isShuffling || isUndoing || startNumpad === null) {
+                // タップと区別するために、わずかな移動でもタッチムーブがあったと見なす
+                // または、そもそもスワイプと認識できるほどの移動がなかった場合は無視
+                const dx = event.changedTouches[0].clientX - touchStartX;
+                const dy = event.changedTouches[0].clientY - touchStartY;
+                if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) {
+                    return; // スワイプと見なせない場合は無視
+                }
+            }
+            
             const touchEndX = event.changedTouches[0].clientX;
             const touchEndY = event.changedTouches[0].clientY;
+            const endNumpad = getNumpadFromScreenCoords(touchEndX, touchEndY);
 
-            const dx = touchEndX - touchStartX;
-            const dy = touchEndY - touchStartY;
+            if (startNumpad !== null && endNumpad !== null && startNumpad !== endNumpad) {
+                const operation = `${startNumpad}-${endNumpad}`;
+                console.log("Operation (Touch):", operation);
 
-            // 左右スワイプ (Y軸回転)
-            if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_THRESHOLD) {
-                if (dx > 0) { // 右スワイプ
-                    performRotation('5-6'); // キューブ全体をY軸正方向へ90度回転
-                    console.log("Swipe Right -> Cube Y+ rotation");
-                } else { // 左スワイプ
-                    performRotation('5-4'); // キューブ全体をY軸正方向へ-90度回転
-                    console.log("Swipe Left -> Cube Y- rotation");
+                if (operation === '0-2') { // キューブ状態出力
+                    logCubeState();
+                } else if (operation === '0-1') { // シャッフル機能
+                    shuffleCube();
+                } else if (operation === '0-0') { // アンドゥ機能
+                    undoLastMove();
+                } else if (operation === '5-5') { // カメラ視点変更
+                    changeCameraView();
+                } else {
+                    performRotation(operation);
                 }
             }
-            // 上下スワイプ (X軸回転)
-            else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > SWIPE_THRESHOLD) {
-                if (dy > 0) { // 下スワイプ
-                    performRotation('5-2'); // キューブ全体をX軸正方向へ90度回転
-                    console.log("Swipe Down -> Cube X+ rotation");
-                } else { // 上スワイプ
-                    performRotation('5-8'); // キューブ全体をX軸正方向へ-90度回転
-                    console.log("Swipe Up -> Cube X- rotation");
-                }
-            }
+            startNumpad = null; // リセット
+            touchMoved = false;
         });
 
 
@@ -417,6 +487,7 @@
             targetRotationAngle = angle;
             currentRotationAngle = 0;
             isRotating = true;
+            updateButtonStates(); // ボタンの状態を更新
         }
 
         // 指定された軸位置のキューブレットを選択し、回転グループに追加する関数
@@ -499,6 +570,7 @@
             });
 
             isRotating = false; // 回転アニメーション終了
+            updateButtonStates(); // ボタンの状態を更新
 
             // シャッフル中であれば次の操作を実行
             if (isShuffling && shuffleQueue.length > 0) {
@@ -509,6 +581,7 @@
             } else if (isShuffling && shuffleQueue.length === 0) {
                 isShuffling = false;
                 console.log("シャッフル完了！");
+                updateButtonStates(); // シャッフル完了時にも更新
             }
 
             // アンドゥ中であれば次の操作を実行
@@ -519,6 +592,7 @@
             } else if (isUndoing && shuffleQueue.length === 0) {
                 isUndoing = false;
                 console.log("アンドゥ完了！");
+                updateButtonStates(); // アンドゥ完了時にも更新
             }
         }
 
@@ -539,7 +613,7 @@
         ];
 
         async function shuffleCube() {
-            if (isRotating || isShuffling || isUndoing) return; // 回転中やシャッフル中は無視
+            if (isRotating || isShuffling || isUndoing || isCameraAnimating) return; // 回転中やシャッフル中は無視
 
             console.log("シャッフルを開始します...");
             isShuffling = true;
@@ -555,11 +629,12 @@
             
             // 最初のシャッフル操作を開始
             performRotation(shuffleQueue.shift(), 'shuffle');
+            updateButtonStates(); // シャッフル開始時にも更新
         }
 
         // --- アンドゥ機能 ---
         function undoLastMove() {
-            if (isRotating || isShuffling || isUndoing) return; // 回転中やシャッフル中は無視
+            if (isRotating || isShuffling || isUndoing || isCameraAnimating) return; // 回転中やシャッフル中は無視
 
             if (moveHistory.length === 0) {
                 console.log("アンドゥできる操作がありません。");
@@ -581,6 +656,7 @@
                 console.log(`逆操作が定義されていません: ${lastMove}`);
                 isUndoing = false;
             }
+            updateButtonStates(); // アンドゥ開始時にも更新
         }
 
         // 操作の逆操作を取得するヘルパー関数
@@ -618,7 +694,7 @@
                 case '8-4':
                 case '4-2':
                 case '2-6':
-                case '6-8': return '8-6'; // 8-4, 4-2, 2-6, 6-8 の逆は 8-6, 6-2, 2-4, 4-8
+                case '6-8': return '8-6'; // 8-4, 4-2, 2-6, 6-8 の逆は 8-6, 6-2, 2-4, 6-8
 
                 // 中央列の回転
                 case '8-8':
@@ -672,6 +748,7 @@
                     camera.quaternion.copy(targetCameraQuaternion); // 完全に目標向きに設定
                     isCameraAnimating = false;
                     console.log("カメラアニメーション完了。");
+                    updateButtonStates(); // カメラアニメーション完了時にも更新
                 }
             }
 
@@ -722,6 +799,7 @@
             targetCameraQuaternion.copy(tempCameraForTarget.quaternion);
 
             isCameraAnimating = true; // カメラアニメーションを開始
+            updateButtonStates(); // カメラアニメーション開始時にも更新
         }
 
 
@@ -841,6 +919,30 @@
 
             console.log("----------------------");
         }
+
+        // --- ボタン要素の取得とイベントリスナーの設定 ---
+        const shuffleButton = document.getElementById('shuffleButton');
+        const undoButton = document.getElementById('undoButton');
+        const logStateButton = document.getElementById('logStateButton');
+        const cameraViewButton = document.getElementById('cameraViewButton');
+
+        shuffleButton.addEventListener('click', shuffleCube);
+        undoButton.addEventListener('click', undoLastMove);
+        logStateButton.addEventListener('click', logCubeState);
+        cameraViewButton.addEventListener('click', changeCameraView);
+
+        // ボタンの活性/非活性を制御する関数
+        function updateButtonStates() {
+            const isAnyAnimationInProgress = isRotating || isCameraAnimating || isShuffling || isUndoing;
+
+            shuffleButton.disabled = isAnyAnimationInProgress;
+            undoButton.disabled = isAnyAnimationInProgress || moveHistory.length === 0;
+            logStateButton.disabled = isAnyAnimationInProgress;
+            cameraViewButton.disabled = isAnyAnimationInProgress;
+        }
+
+        // 初期ロード時にボタンの状態を更新
+        updateButtonStates();
     </script>
 </body>
 </html>
