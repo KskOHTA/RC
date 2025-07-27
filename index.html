@@ -503,41 +503,57 @@
             scene.add(rotatingGroup); // rotatingGroupをシーンに追加
         }
 
+        /**
+         * @attention ここから修正箇所
+         */
         function updateCubeletPositions(source = 'user') {
+            // pivotのワールド行列を最新の状態に更新する
+            // これにより、pivotのworldPositionやworldQuaternionが正確になる
+            pivot.updateMatrixWorld(true);
+
             for (let i = rotatingGroup.children.length - 1; i >= 0; i--) {
                 const cubelet = rotatingGroup.children[i];
 
-                rotatingGroup.updateMatrixWorld(true);
-                cubelet.updateMatrixWorld(true);
-
+                // キューブレットのワールド座標とワールド回転を取得（回転前の親に対する相対的な位置）
                 const worldPosition = new THREE.Vector3();
                 cubelet.getWorldPosition(worldPosition);
                 const worldQuaternion = new THREE.Quaternion();
                 cubelet.getWorldQuaternion(worldQuaternion);
 
+                // rotatingGroupからキューブレットを削除
+                rotatingGroup.remove(cubelet);
+
+                // キューブレットのpositionとquaternionをワールド値に設定
+                // これにより、次にpivotに追加されたときに正しくローカル値に変換される基盤を作る
                 cubelet.position.copy(worldPosition);
                 cubelet.quaternion.copy(worldQuaternion);
-                cubelet.matrix.identity();
-                cubelet.matrix.compose(cubelet.position, cubelet.quaternion, cubelet.scale);
 
-                // 精度誤差対策
+                // pivotの子に戻す。この時点でThree.jsがworldPositionとworldQuaternionを
+                // pivotのローカル座標系に自動的に変換してcubelet.positionとcubelet.quaternionに設定する
+                pivot.add(cubelet);
+
+                // その後、pivotのローカル座標系でのcubelet.positionとcubelet.quaternionをスナップする
                 const gridUnit = (cubeSize + gap);
                 cubelet.position.x = Math.round(cubelet.position.x / gridUnit) * gridUnit;
                 cubelet.position.y = Math.round(cubelet.position.y / gridUnit) * gridUnit;
                 cubelet.position.z = Math.round(cubelet.position.z / gridUnit) * gridUnit;
 
+                // 回転を90度の倍数にスナップ
+                const snapAngle = Math.PI / 2; // 90度
                 const euler = new THREE.Euler().setFromQuaternion(cubelet.quaternion, 'XYZ');
-                euler.x = Math.round(euler.x / (Math.PI / 2)) * (Math.PI / 2);
-                euler.y = Math.round(euler.y / (Math.PI / 2)) * (Math.PI / 2);
-                euler.z = Math.round(euler.z / (Math.PI / 2)) * (Math.PI / 2);
+                euler.x = Math.round(euler.x / snapAngle) * snapAngle;
+                euler.y = Math.round(euler.y / snapAngle) * snapAngle;
+                euler.z = Math.round(euler.z / snapAngle) * snapAngle;
                 cubelet.quaternion.setFromEuler(euler);
-
-                pivot.add(cubelet); // pivotの子に戻す
             }
-            rotatingGroup.clear(); // 回転グループから全ての子を削除
+            rotatingGroup.clear(); // rotatingGroupを空にする
             scene.remove(rotatingGroup); // rotatingGroupをシーンから削除
 
             isRotating = false;
+
+            /**
+             * @attention 修正箇所ここまで
+             */
 
             if (isShuffling && shuffleQueue.length > 0) {
                 setTimeout(() => { performRotation(shuffleQueue.shift(), 'shuffle'); }, 100);
