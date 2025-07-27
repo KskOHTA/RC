@@ -79,8 +79,7 @@
 </head>
 <body>
     <div id="info">
-        <details>
-            <summary><h1>Rubik's Cube Simulator 操作説明</h1></summary>
+        <details open> <summary><h1>Rubik's Cube Simulator 操作説明</h1></summary>
             <p>テンキーで操作してください:</p>
             <ul>
                 <li><b>9-9, 3-9</b>: Right面 90度時計回転</li>
@@ -111,11 +110,11 @@
                 <li><b>0-2</b>: **キューブの状態をコンソールに出力**</li>
             </ul>
             <p>※連続してキーを入力してください。</p>
-            <p><b>タッチ操作（スワイプ）によるテンキー入力の再現:</b></p>
+            <p><b>タッチ操作（スワイプ/タップ）:</b></p>
             <ul>
-                <li>画面全体がテンキーの 7 8 9 / 4 5 6 / 1 2 3 に対応します。</li>
-                <li>タッチ開始位置の数字と、スワイプ終了位置の数字を組み合わせることで、テンキー入力と同様の操作が可能です。</li>
-                <li>例: 画面左上（7のエリア）でタッチ開始し、中央上（8のエリア）へスワイプすると「7-8」の操作になります。</li>
+                <li><b>スワイプ:</b> フロント面 (Z=1のレイヤー) 上のキューブレットをタッチ開始点、別のキューブレット上をスワイプ終了点として認識し、対応するテンキー操作 (例: 7-8) を実行します。</li>
+                <li><b>ダブルタップ:</b> フロント面 (Z=1のレイヤー) 上の同じキューブレットを素早く2回タップすると、対応するテンキーの連続操作 (例: 8-8) を実行します。</li>
+                <li>画面がキューブ全体を映している場合、タッチしたキューブレットがフロント面（Z=1レイヤー）のものでなければ、テンキー操作は行われません。</li>
             </ul>
         </details>
     </div>
@@ -174,6 +173,7 @@
         const cubelets = []; // 全てのキューブレットを格納する配列
         const cubeSize = 50; // 各キューブレットの一辺のサイズ
         const gap = 2; // キューブレット間の隙間
+        const gridUnit = (cubeSize + gap); // 論理グリッドの単位
 
         // --- 個々のキューブレット (ミニキューブ) の作成 ---
         for (let x = -1; x <= 1; x++) {
@@ -191,7 +191,7 @@
                     ];
                     const cubelet = new THREE.Mesh(geometry, materials);
                     // キューブレットの位置を設定（中央のキューブを原点とする）
-                    cubelet.position.set(x * (cubeSize + gap), y * (cubeSize + gap), z * (cubeSize + gap));
+                    cubelet.position.set(x * gridUnit, y * gridUnit, z * gridUnit);
                     scene.add(cubelet);
                     cubelets.push(cubelet);
                 }
@@ -240,32 +240,67 @@
         });
 
         // --- タッチ操作処理 ---
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
         let touchStartX = 0;
         let touchStartY = 0;
         let startNumpad = null;
-        let touchMoved = false;
+        let lastTapTime = 0;
+        let lastTapNumpad = null;
         const SWIPE_THRESHOLD = 20; // スワイプと認識する最低距離（ピクセル）
+        const DOUBLE_TAP_TIMEOUT = 300; // ダブルタップと認識する時間（ms）
 
-        // 画面座標からテンキーの数字 (1-9) を取得する関数
-        function getNumpadFromScreenCoords(clientX, clientY) {
+        // 画面座標からThree.jsのRaycaster用の正規化デバイス座標を取得
+        function getNormalizedDeviceCoords(clientX, clientY) {
             const rect = renderer.domElement.getBoundingClientRect();
-            const x = clientX - rect.left;
-            const y = clientY - rect.top;
+            pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+            return pointer;
+        }
 
-            const colWidth = rect.width / 3;
-            const rowHeight = rect.height / 3;
-
-            const col = Math.floor(x / colWidth);
-            const row = Math.floor(y / rowHeight);
-
-            // テンキーの配置 (7 8 9 / 4 5 6 / 1 2 3) にマッピング
-            if (row >= 0 && row <= 2 && col >= 0 && col <= 2) {
-                // row 0: 7, 8, 9
-                // row 1: 4, 5, 6
-                // row 2: 1, 2, 3
-                return (2 - row) * 3 + (col + 1);
+        // Raycastを実行し、交差したキューブレットを返す
+        function getIntersectedCubelet(clientX, clientY) {
+            const normalizedCoords = getNormalizedDeviceCoords(clientX, clientY);
+            raycaster.setFromCamera(normalizedCoords, camera);
+            const intersects = raycaster.intersectObjects(cubelets);
+            if (intersects.length > 0) {
+                return intersects[0].object; // 最も手前のキューブレットを返す
             }
-            return null; // 有効な範囲外
+            return null;
+        }
+
+        // キューブレットの論理的なグリッド位置 (X, Y, Z) を取得
+        function getCubeletGridPosition(cubelet) {
+            cubelet.updateMatrixWorld(); // 最新のワールド行列を計算
+            const worldPosition = new THREE.Vector3();
+            cubelet.getWorldPosition(worldPosition); // キューブレットのワールド座標を取得
+
+            // ワールド座標をルービックキューブの論理的なグリッド座標 (-1, 0, 1) に変換
+            const currentGridX = Math.round(worldPosition.x / gridUnit);
+            const currentGridY = Math.round(worldPosition.y / gridUnit);
+            const currentGridZ = Math.round(worldPosition.z / gridUnit);
+            return { x: currentGridX, y: currentGridY, z: currentGridZ };
+        }
+
+        // 論理的なグリッド位置からテンキーの数字 (1-9) を取得 (フロント面 Z=1 の場合のみ)
+        function getLogicalNumpadPosition(cubelet) {
+            const gridPos = getCubeletGridPosition(cubelet);
+
+            // フロント面 (Z=1レイヤー) のキューブレットのみを対象とする
+            if (gridPos.z === 1) { // Z=1 のレイヤーが論理的なFront面
+                // X: -1(左), 0(中央), 1(右)
+                // Y: -1(下), 0(中央), 1(上)
+                if (gridPos.y === 1 && gridPos.x === -1) return 7; // Top-Left
+                if (gridPos.y === 1 && gridPos.x === 0) return 8;  // Top-Middle
+                if (gridPos.y === 1 && gridPos.x === 1) return 9;  // Top-Right
+                if (gridPos.y === 0 && gridPos.x === -1) return 4; // Middle-Left
+                if (gridPos.y === 0 && gridPos.x === 0) return 5;  // Middle-Center
+                if (gridPos.y === 0 && gridPos.x === 1) return 6;  // Middle-Right
+                if (gridPos.y === -1 && gridPos.x === -1) return 1; // Bottom-Left
+                if (gridPos.y === -1 && gridPos.x === 0) return 2;  // Bottom-Middle
+                if (gridPos.y === -1 && gridPos.x === 1) return 3;  // Bottom-Right
+            }
+            return null; // フロント面 (Z=1) でない、または無効な位置
         }
 
 
@@ -273,49 +308,78 @@
             if (isRotating || isCameraAnimating || isShuffling || isUndoing) return;
             touchStartX = event.touches[0].clientX;
             touchStartY = event.touches[0].clientY;
-            startNumpad = getNumpadFromScreenCoords(touchStartX, touchStartY);
-            touchMoved = false;
+            
+            const touchedCubelet = getIntersectedCubelet(touchStartX, touchStartY);
+            startNumpad = touchedCubelet ? getLogicalNumpadPosition(touchedCubelet) : null;
+            
             event.preventDefault(); // スクロールを防ぐ
-        });
-
-        renderer.domElement.addEventListener('touchmove', (event) => {
-            event.preventDefault(); // スクロールを防ぐ
-            touchMoved = true;
         });
 
         renderer.domElement.addEventListener('touchend', (event) => {
-            if (isRotating || isCameraAnimating || isShuffling || isUndoing || startNumpad === null) {
-                // タップと区別するために、わずかな移動でもタッチムーブがあったと見なす
-                // または、そもそもスワイプと認識できるほどの移動がなかった場合は無視
-                const dx = event.changedTouches[0].clientX - touchStartX;
-                const dy = event.changedTouches[0].clientY - touchStartY;
-                if (Math.abs(dx) < SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_THRESHOLD) {
-                    return; // スワイプと見なせない場合は無視
-                }
+            if (isRotating || isCameraAnimating || isShuffling || isUndoing) {
+                // アニメーション中はタップもスワイプも受け付けない
+                lastTapTime = 0; // タップ状態もリセット
+                lastTapNumpad = null;
+                return;
             }
-            
+
             const touchEndX = event.changedTouches[0].clientX;
             const touchEndY = event.changedTouches[0].clientY;
-            const endNumpad = getNumpadFromScreenCoords(touchEndX, touchEndY);
 
-            if (startNumpad !== null && endNumpad !== null && startNumpad !== endNumpad) {
-                const operation = `${startNumpad}-${endNumpad}`;
-                console.log("Operation (Touch):", operation);
+            const dx = touchEndX - touchStartX;
+            const dy = touchEndY - touchStartY;
+            const isSwipe = Math.abs(dx) > SWIPE_THRESHOLD || Math.abs(dy) > SWIPE_THRESHOLD;
 
-                if (operation === '0-2') { // キューブ状態出力
-                    logCubeState();
-                } else if (operation === '0-1') { // シャッフル機能
-                    shuffleCube();
-                } else if (operation === '0-0') { // アンドゥ機能
-                    undoLastMove();
-                } else if (operation === '5-5') { // カメラ視点変更
-                    changeCameraView();
+            const currentTouchedCubelet = getIntersectedCubelet(touchEndX, touchEndY);
+            const endNumpad = currentTouchedCubelet ? getLogicalNumpadPosition(currentTouchedCubelet) : null;
+
+            if (endNumpad === null) {
+                // フロント面のキューブレットに触れていない場合、タップ状態をリセットして終了
+                lastTapTime = 0;
+                lastTapNumpad = null;
+                return;
+            }
+
+            if (isSwipe) {
+                // スワイプが検出された場合
+                if (startNumpad !== null && startNumpad !== endNumpad) {
+                    const operation = `${startNumpad}-${endNumpad}`;
+                    console.log("Operation (Swipe):", operation);
+                    // テンキー操作を実行
+                    if (operation === '0-2') { logCubeState(); }
+                    else if (operation === '0-1') { shuffleCube(); }
+                    else if (operation === '0-0') { undoLastMove(); }
+                    else if (operation === '5-5') { changeCameraView(); }
+                    else { performRotation(operation); }
+                }
+                // スワイプ後はダブルタップ状態をリセット
+                lastTapTime = 0;
+                lastTapNumpad = null;
+
+            } else {
+                // タップ（動きが少ない）が検出された場合
+                const currentTime = Date.now();
+                
+                if (currentTime - lastTapTime < DOUBLE_TAP_TIMEOUT && lastTapNumpad === endNumpad) {
+                    // 同じエリアでのダブルタップが検出された
+                    const operation = `${endNumpad}-${endNumpad}`;
+                    console.log("Operation (Double Tap):", operation);
+                    // テンキー操作を実行
+                    if (operation === '0-2') { logCubeState(); }
+                    else if (operation === '0-1') { shuffleCube(); }
+                    else if (operation === '0-0') { undoLastMove(); }
+                    else if (operation === '5-5') { changeCameraView(); }
+                    else { performRotation(operation); }
+
+                    lastTapTime = 0; // 次のタップシーケンスのためにリセット
+                    lastTapNumpad = null;
                 } else {
-                    performRotation(operation);
+                    // シングルタップとして記録
+                    lastTapTime = currentTime;
+                    lastTapNumpad = endNumpad;
                 }
             }
-            startNumpad = null; // リセット
-            touchMoved = false;
+            event.preventDefault(); // ブラウザのデフォルトタッチアクション（スクロールなど）を防ぐ
         });
 
 
@@ -500,12 +564,12 @@
                 const worldPosition = new THREE.Vector3();
                 cubelet.getWorldPosition(worldPosition); // キューブレットのワールド座標を取得
 
-                const tolerance = (cubeSize + gap) / 2; // 位置比較の許容誤差
+                const tolerance = gridUnit / 2; // 位置比較の許容誤差
 
                 // 各軸の値が指定されている場合は、その軸の位置が条件を満たすかチェック
-                const inX = xVal === null || Math.abs(worldPosition.x - xVal * (cubeSize + gap)) < tolerance;
-                const inY = yVal === null || Math.abs(worldPosition.y - yVal * (cubeSize + gap)) < tolerance;
-                const inZ = zVal === null || Math.abs(worldPosition.z - zVal * (cubeSize + gap)) < tolerance;
+                const inX = xVal === null || Math.abs(worldPosition.x - xVal * gridUnit) < tolerance;
+                const inY = yVal === null || Math.abs(worldPosition.y - yVal * gridUnit) < tolerance;
+                const inZ = zVal === null || Math.abs(worldPosition.z - zVal * gridUnit) < tolerance;
 
                 return inX && inY && inZ; // 全ての条件を満たすキューブレットを選択
             });
@@ -543,7 +607,6 @@
                 cubelet.matrix.compose(cubelet.position, cubelet.quaternion, cubelet.scale);
 
                 // --- 精度誤差対策: 位置と回転の丸め込み ---
-                const gridUnit = (cubeSize + gap);
                 cubelet.position.x = Math.round(cubelet.position.x / gridUnit) * gridUnit;
                 cubelet.position.y = Math.round(cubelet.position.y / gridUnit) * gridUnit;
                 cubelet.position.z = Math.round(cubelet.position.z / gridUnit) * gridUnit;
@@ -667,8 +730,22 @@
                 case '3-9': return '3-3'; // 9-9, 3-9 の逆は 3-3, 9-3
                 case '3-3':
                 case '9-3': return '9-9'; // 3-3, 9-3 の逆は 9-9, 3-9
-                case '7-8': return '9-8';
-                case '9-8': return '7-8';
+                case '7-8':
+                case '8-9':
+                case '9-6':
+                case '6-3':
+                case '3-2':
+                case '2-1':
+                case '1-4':
+                case '4-7': return '9-8'; // Front面時計回転の逆はFront面反時計回転
+                case '9-8':
+                case '8-7':
+                case '7-4':
+                case '4-1':
+                case '1-2':
+                case '2-3':
+                case '3-6':
+                case '6-9': return '7-8'; // Front面反時計回転の逆はFront面時計回転
                 case '7-9': return '9-7';
                 case '9-7': return '7-9';
                 case '7-7':
@@ -837,9 +914,9 @@
                 cubelet.getWorldPosition(worldPosition); // ワールド座標を取得
 
                 // ワールド座標をルービックキューブの論理的なグリッド座標 (-1, 0, 1) に変換
-                const currentGridX = Math.round(worldPosition.x / (cubeSize + gap));
-                const currentGridY = Math.round(worldPosition.y / (cubeSize + gap));
-                const currentGridZ = Math.round(worldPosition.z / (cubeSize + gap));
+                const currentGridX = Math.round(worldPosition.x / gridUnit);
+                const currentGridY = Math.round(worldPosition.y / gridUnit);
+                const currentGridZ = Math.round(worldPosition.z / gridUnit);
 
                 // 各キューブレットの6面それぞれについて、その面のワールド向きと色をチェック
                 // BoxGeometryの面の順序: Right (+X), Left (-X), Top (+Y), Bottom (-Y), Front (+Z), Back (-Z)
