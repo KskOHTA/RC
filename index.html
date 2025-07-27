@@ -452,12 +452,13 @@
 
                 // 既にリストに似たクォータニオンが存在しないかチェック (浮動小数点誤差を考慮)
                 let isDuplicate = false;
-                // --- 修正箇所: negate() の呼び出し方法を変更 ---
-                const qNegated = q.clone();
-                qNegated.negate();
-                if (existingQ.angleTo(q) < 0.001 || existingQ.angleTo(qNegated) < 0.001) {
-                    isDuplicate = true;
-                    break;
+                // --- 修正箇所: ここでの negate() 呼び出しを削除 ---
+                for (const existingQ of SNAP_QUATERNIONS) {
+                    // angleToはqと-qを同じ向きとして扱うため、negate()は不要
+                    if (existingQ.angleTo(q) < 0.001) {
+                        isDuplicate = true;
+                        break;
+                    }
                 }
                 // --- 修正箇所ここまで ---
                 if (!isDuplicate) {
@@ -586,7 +587,7 @@
                 cubelet.position.y = Math.round(cubelet.position.y / gridUnit) * gridUnit;
                 cubelet.position.z = Math.round(cubelet.position.z / gridUnit) * gridUnit;
 
-                // --- 修正箇所: クォータニオンを最も近い正規の向きにスナップ ---
+                // --- クォータニオンを最も近い正規の向きにスナップ ---
                 let closestQuaternion = SNAP_QUATERNIONS[0];
                 let minAngle = cubelet.quaternion.angleTo(closestQuaternion);
 
