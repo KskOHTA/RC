@@ -49,23 +49,32 @@
         <h1>Rubik's Cube Simulator</h1>
         <p>テンキーで操作してください:</p>
         <ul>
-            <li><b>9-9</b>: Right面 90度時計回転</li>
-            <li><b>3-3</b>: Right面 90度反時計回転</li>
-            <li><b>5-2, 5-8, 8-5, 2-5</b>: キューブ全体をRight面基準で反時計方向に90度回転</li>
-            <li><b>5-4, 6-5</b>: キューブ全体をTop面基準で反時計方向に90度回転</li>
-            <li><b>5-6, 4-5</b>: キューブ全体をTop面基準で時計方向に90度回転</li>
-            <li><b>9-8, 8-7, 7-4, 4-1, 1-2, 2-3, 3-6, 6-9</b>: Front面 反時計方向に90度回転</li>
-            <li><b>7-8, 8-9, 9-6, 6-3, 3-2, 2-1, 1-4, 4-7</b>: Front面 時計方向に90度回転</li>
+            <li><b>9-9, 3-9</b>: Right面 90度時計回転</li>
+            <li><b>3-3, 9-3</b>: Right面 90度反時計回転</li>
+            <li><b>7-8, 8-9, 9-6, 6-3, 3-2, 2-1, 1-4, 4-7</b>: Front面 90度時計回転</li>
+            <li><b>9-8, 8-7, 7-4, 4-1, 1-2, 2-3, 3-6, 6-9</b>: Front面 90度反時計回転</li>
             <li><b>7-9</b>: Top面 90度時計回転</li>
             <li><b>9-7</b>: Top面 90度反時計回転</li>
-            <li><b>7-7</b>: Left面 90度時計回転</li>
-            <li><b>1-1</b>: Left面 90度反時計回転</li>
+            <li><b>7-7, 1-7</b>: Left面 90度時計回転</li>
+            <li><b>1-1, 7-1</b>: Left面 90度反時計回転</li>
             <li><b>1-3</b>: Bottom面 90度時計回転</li>
             <li><b>3-1</b>: Bottom面 90度反時計回転</li>
+            <li><b>5-2, 8-5</b>: キューブ全体をX軸正方向へ90度回転</li>
+            <li><b>5-8, 2-5</b>: キューブ全体をX軸正方向へ-90度回転</li>
+            <li><b>5-4, 6-5</b>: キューブ全体をY軸正方向へ-90度回転</li>
+            <li><b>5-6, 4-5</b>: キューブ全体をY軸正方向へ90度回転</li>
+            <li><b>8-6, 6-2, 2-4, 4-8</b>: キューブ全体をZ軸正方向へ-90度回転</li>
+            <li><b>8-4, 4-2, 2-6, 6-8</b>: キューブ全体をZ軸正方向へ90度回転</li>
+            <li><b>8-8, 2-8</b>: 中央X列 (X=0) を時計回転</li>
+            <li><b>8-2, 2-2</b>: 中央X列 (X=0) を反時計回転</li>
+            <li><b>6-6, 4-6</b>: 中央Y列 (Y=0) を時計回転</li>
+            <li><b>4-4, 6-4</b>: 中央Y列 (Y=0) を反時計回転</li>
+            <li><b>5-7</b>: 中央Z列 (Z=0) を時計回転</li>
+            <li><b>5-1</b>: 中央Z列 (Z=0) を反時計回転</li>
             <li><b>5-5</b>: カメラ視点をTop, Front, RightとTop, Front, Leftで切り替え (アニメーション)</li>
             <li><b>0-1</b>: **キューブをシャッフル** (アニメーション付き)</li>
-            <li><b>0-2</b>: **アンドゥ** (直前の操作を取り消す)</li>
-            <li><b>0-0</b>: キューブの状態をコンソールに出力</li>
+            <li><b>0-0</b>: **アンドゥ** (直前の操作を取り消す)</li>
+            <li><b>0-2</b>: **キューブの状態をコンソールに出力**</li>
         </ul>
         <p>※連続してキーを入力してください。</p>
     </div>
@@ -159,11 +168,11 @@
                     const operation = firstKey + '-' + key;
                     console.log("Operation:", operation);
 
-                    if (operation === '0-0') { // デバッグ用のキューブ状態出力
+                    if (operation === '0-2') { // キューブ状態出力 (変更箇所)
                         logCubeState();
                     } else if (operation === '0-1') { // シャッフル機能
                         shuffleCube();
-                    } else if (operation === '0-2') { // アンドゥ機能
+                    } else if (operation === '0-0') { // アンドゥ機能 (変更箇所)
                         undoLastMove();
                     } else if (operation === '5-5') { // カメラ視点変更
                         changeCameraView();
@@ -225,15 +234,31 @@
             switch (operation) {
                 // --- 面の回転 (Right, Front, Top, Left, Bottom) ---
                 case '9-9': // Right面 90度時計回転
+                case '3-9': // (追加) 9-9と同じ操作
                     axis.set(1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(1, null, null);
                     break;
                 case '3-3': // Right面 90度反時計回転
+                case '9-3': // (追加) 3-3と同じ操作
                     axis.set(1, 0, 0); angle = Math.PI / 2; selectCubeletsByPosition(1, null, null);
                     break;
                 case '7-8': // Front面 時計方向に90度回転
+                case '8-9':
+                case '9-6':
+                case '6-3':
+                case '3-2':
+                case '2-1':
+                case '1-4':
+                case '4-7':
                     axis.set(0, 0, 1); angle = -Math.PI / 2; selectCubeletsByPosition(null, null, 1);
                     break;
                 case '9-8': // Front面 反時計方向に90度回転
+                case '8-7':
+                case '7-4':
+                case '4-1':
+                case '1-2':
+                case '2-3':
+                case '3-6':
+                case '6-9':
                     axis.set(0, 0, 1); angle = Math.PI / 2; selectCubeletsByPosition(null, null, 1);
                     break;
                 case '7-9': // Top面 90度時計回転
@@ -243,9 +268,11 @@
                     axis.set(0, 1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, 1, null);
                     break;
                 case '7-7': // Left面 90度時計回転
+                case '1-7': // (追加) 7-7と同じ操作
                     axis.set(-1, 0, 0); angle = Math.PI / 2; selectCubeletsByPosition(-1, null, null);
                     break;
                 case '1-1': // Left面 90度反時計回転
+                case '7-1': // (追加) 1-1と同じ操作
                     axis.set(-1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(-1, null, null);
                     break;
                 case '1-3': // Bottom面 90度時計回転
@@ -302,8 +329,6 @@
                 case '6-4':
                     axis.set(0, 1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, 0, null);
                     break;
-                // ここに中央Z列の回転を追加することも可能
-                // Z=0の回転 (FrontとBackの中間)
                 case '5-7': // Z=0面を時計回転 (Front面基準)
                     axis.set(0, 0, 1); angle = -Math.PI / 2; selectCubeletsByPosition(null, null, 0);
                     break;
@@ -317,9 +342,8 @@
                     return; // 処理を中断
             }
 
-            // 履歴への追加は、シャッフルまたはアンドゥ操作でない場合、または
-            // シャッフル中であっても個々の回転として記録する場合に行う
-            if (source === 'user' || source === 'shuffle') {
+            // 履歴への追加は、アンドゥ操作でない場合に行う
+            if (source !== 'undo') { 
                 moveHistory.push(operation);
                 console.log("履歴に追加:", operation);
             }
@@ -504,14 +528,18 @@
         function getReverseOperation(operation) {
             switch (operation) {
                 // 面の回転
-                case '9-9': return '3-3';
-                case '3-3': return '9-9';
+                case '9-9': 
+                case '3-9': return '3-3'; // 9-9, 3-9 の逆は 3-3, 9-3
+                case '3-3':
+                case '9-3': return '9-9'; // 3-3, 9-3 の逆は 9-9, 3-9
                 case '7-8': return '9-8';
                 case '9-8': return '7-8';
                 case '7-9': return '9-7';
                 case '9-7': return '7-9';
-                case '7-7': return '1-1';
-                case '1-1': return '7-7';
+                case '7-7':
+                case '1-7': return '1-1'; // 7-7, 1-7 の逆は 1-1, 7-1
+                case '1-1':
+                case '7-1': return '7-7'; // 1-1, 7-1 の逆は 7-7, 1-7
                 case '1-3': return '3-1';
                 case '3-1': return '1-3';
 
