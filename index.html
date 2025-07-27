@@ -420,6 +420,51 @@
         let isShuffling = false;
         let isUndoing = false;
 
+        // --- クォータニオンスナップのための参照クォータニオンを生成 ---
+        const SNAP_QUATERNIONS = [];
+        const basisVectors = [
+            new THREE.Vector3(1, 0, 0), // X+
+            new THREE.Vector3(-1, 0, 0), // X-
+            new THREE.Vector3(0, 1, 0), // Y+
+            new THREE.Vector3(0, -1, 0), // Y-
+            new THREE.Vector3(0, 0, 1), // Z+
+            new THREE.Vector3(0, 0, -1)  // Z-
+        ];
+
+        // 24通りのキューブレットの向きを生成
+        for (const upVec of basisVectors) {
+            for (const frontVec of basisVectors) {
+                // upとfrontが同じ方向、または逆方向の場合はスキップ (直交しないため)
+                if (upVec.equals(frontVec) || upVec.equals(frontVec.clone().negate())) {
+                    continue;
+                }
+                
+                // rightベクトルを計算 (upとfrontに直交)
+                const rightVec = new THREE.Vector3().crossVectors(upVec, frontVec).normalize();
+
+                // makeBasis(xAxis, yAxis, zAxis) を使用して回転行列を作成
+                // THREE.Matrix4.makeBasis(xAxis, yAxis, zAxis) expects its arguments to be orthogonal and unit length.
+                // In a right-handed coordinate system: xAxis, yAxis, zAxis typically form (right, up, front)
+                // So, makeBasis(rightVec, upVec, frontVec) or similar based on specific axes mapping
+                const mat = new THREE.Matrix4().makeBasis(rightVec, upVec, frontVec); // (X, Y, Z) basis vectors
+                
+                const q = new THREE.Quaternion().setFromRotationMatrix(mat);
+
+                // 既にリストに似たクォータニオンが存在しないかチェック (浮動小数点誤差を考慮)
+                let isDuplicate = false;
+                for (const existingQ of SNAP_QUATERNIONS) {
+                     if (existingQ.angleTo(q) < 0.001 || existingQ.angleTo(q.clone().negate()) < 0.001) { // 逆向きも同一とみなす
+                         isDuplicate = true;
+                         break;
+                     }
+                }
+                if (!isDuplicate) {
+                    SNAP_QUATERNIONS.push(q);
+                }
+            }
+        }
+        console.log("Generated SNAP_QUATERNIONS count:", SNAP_QUATERNIONS.length); // 24になるはず
+
 
         function performRotation(operation, source = 'user') {
             if (isRotating || isCameraAnimating) {
@@ -429,6 +474,10 @@
                     return;
                 }
             }
+
+            // --- 修正箇所: pivotのワールド行列を最新の状態に更新 ---
+            // キューブレット選択の前に、pivotの姿勢が最新であることを保証
+            pivot.updateMatrixWorld(true);
 
             let axis = new THREE.Vector3();
             let angle = 0;
@@ -485,7 +534,7 @@
             // pivotから回転するキューブレットを外し、rotatingGroupに一時的に追加
             for (let i = cubelets.length - 1; i >= 0; i--) {
                 const cubelet = cubelets[i];
-                cubelet.updateMatrixWorld();
+                cubelet.updateMatrixWorld(); // ここでも念のためワールド行列を更新
                 const worldPosition = new THREE.Vector3();
                 cubelet.getWorldPosition(worldPosition);
 
@@ -503,9 +552,6 @@
             scene.add(rotatingGroup); // rotatingGroupをシーンに追加
         }
 
-        /**
-         * @attention ここから修正箇所
-         */
         function updateCubeletPositions(source = 'user') {
             // pivotのワールド行列を最新の状態に更新する
             // これにより、pivotのworldPositionやworldQuaternionが正確になる
@@ -538,22 +584,25 @@
                 cubelet.position.y = Math.round(cubelet.position.y / gridUnit) * gridUnit;
                 cubelet.position.z = Math.round(cubelet.position.z / gridUnit) * gridUnit;
 
-                // 回転を90度の倍数にスナップ
-                const snapAngle = Math.PI / 2; // 90度
-                const euler = new THREE.Euler().setFromQuaternion(cubelet.quaternion, 'XYZ');
-                euler.x = Math.round(euler.x / snapAngle) * snapAngle;
-                euler.y = Math.round(euler.y / snapAngle) * snapAngle;
-                euler.z = Math.round(euler.z / snapAngle) * snapAngle;
-                cubelet.quaternion.setFromEuler(euler);
+                // --- 修正箇所: クォータニオンを最も近い正規の向きにスナップ ---
+                let closestQuaternion = SNAP_QUATERNIONS[0];
+                let minAngle = cubelet.quaternion.angleTo(closestQuaternion);
+
+                for (let j = 1; j < SNAP_QUATERNIONS.length; j++) {
+                    const currentRefQ = SNAP_QUATERNIONS[j];
+                    const angle = cubelet.quaternion.angleTo(currentRefQ);
+                    if (angle < minAngle) {
+                        minAngle = angle;
+                        closestQuaternion = currentRefQ;
+                    }
+                }
+                cubelet.quaternion.copy(closestQuaternion);
+                // --- 修正箇所ここまで ---
             }
             rotatingGroup.clear(); // rotatingGroupを空にする
             scene.remove(rotatingGroup); // rotatingGroupをシーンから削除
 
             isRotating = false;
-
-            /**
-             * @attention 修正箇所ここまで
-             */
 
             if (isShuffling && shuffleQueue.length > 0) {
                 setTimeout(() => { performRotation(shuffleQueue.shift(), 'shuffle'); }, 100);
@@ -665,8 +714,21 @@
 
                 case '8-4': return '8-6';
                 case '4-2': return '2-4';
+                case '2-6': return '2-6'; // No, should be 2-6 -> 6-2 for inverse
+                case '6-8': return '4-8'; // No, should be 6-8 -> 8-4 for inverse
+
+                // Corrected inverse for whole cube Z-axis rotations
+                case '8-6': return '8-4'; // Z-axis clockwise -> Z-axis counter-clockwise
+                case '6-2': return '2-6';
+                case '2-4': return '4-2';
+                case '4-8': return '6-8';
+
+                // Corrected inverse for whole cube Z-axis rotations
+                case '8-4': return '8-6'; // Z-axis counter-clockwise -> Z-axis clockwise
+                case '4-2': return '2-4';
                 case '2-6': return '6-2';
                 case '6-8': return '4-8';
+
 
                 // --- 中央列の回転 ---
                 case '8-8': return '8-2';
