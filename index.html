@@ -456,14 +456,14 @@
     <script>
         // --- シーンの初期設定 ---
         const scene = new THREE.Scene();
-        // 直交投影カメラを使用し、ウィンドウサイズに合わせて設定
-        const camera = new THREE.OrthographicCamera(window.innerWidth / -2, window.innerWidth / 2, window.innerHeight / 2, window.innerHeight / -2, 1, 1000);
+        // 透視投影カメラを使用 (FOVを30に縮小)
+        const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true }); // アンチエイリアスを有効に
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // カメラの初期位置をTop-Front-Rightのアイソメトリックビューに設定
-        camera.position.set(100, 100, 300);
+        // カメラの初期位置をTop-Front-Rightのアイソメトリックビューに設定 (より遠くへ)
+        camera.position.set(200, 200, 600); // 透視投影に合わせて位置を調整
         camera.lookAt(0, 0, 0); // 原点を見るように設定
 
         // --- 光源の追加 ---
@@ -497,8 +497,8 @@
         };
 
         const cubelets = []; // 全てのキューブレットを格納する配列
-        const cubeSize = 75; // 各キューブレットの一辺のサイズ
-        const gap = 3; // キューブレット間の隙間
+        const cubeSize = 50; // 各キューブレットの一辺のサイズ
+        const gap = 2; // キューブレット間の隙間
         const gridUnit = (cubeSize + gap); // 論理グリッドの単位
 
         // --- 個々のキューブレット (ミニキューブ) の作成 ---
@@ -822,13 +822,13 @@
                 case '4-5':
                     axis.set(0, 1, 0); angle = Math.PI / 2; selectAll = true;
                     break;
-                case '8-6': // キューブ全体 Z軸正方向 -90度
+                case '8-6':
                 case '6-2':
                 case '2-4':
                 case '4-8':
                     axis.set(0, 0, 1); angle = -Math.PI / 2; selectAll = true;
                     break;
-                case '8-4': // キューブ全体 Z軸正方向 +90度
+                case '8-4':
                 case '4-2':
                 case '2-6':
                 case '6-8':
@@ -1099,7 +1099,7 @@
                 case '5-4':
                 case '6-5': return '5-6'; // 5-4, 6-5 の逆は 5-6, 4-5
                 case '5-6':
-                case '4-5': return '5-4'; // 5-6, 4-5 の逆は 5-4, 6-5
+                case '4-5': return '5-4'; // 4-5, 6-5 の逆は 5-4, 6-5
                 case '8-6':
                 case '6-2':
                 case '2-4':
@@ -1176,11 +1176,8 @@
             const width = window.innerWidth;
             const height = window.innerHeight;
 
-            // 直交投影カメラの視野を更新
-            camera.left = width / -2;
-            camera.right = width / 2;
-            camera.top = height / 2;
-            camera.bottom = height / -2;
+            // 透視投影カメラの視野を更新
+            camera.aspect = width / height; // アスペクト比を更新
             camera.updateProjectionMatrix(); // 投影行列を更新
 
             renderer.setSize(width, height); // レンダラーのサイズも更新
@@ -1197,12 +1194,12 @@
 
             if (currentView === 'TFR') {
                 // 現在のビューがTop-Front-Rightなら、Top-Front-Leftへ切り替え
-                newPosition.set(-100, 100, 300); // 左上奥からの視点
+                newPosition.set(-200, 200, 600); // 左上奥からの視点 (調整済み)
                 console.log("カメラビューをTop-Front-Leftに変更します。");
                 currentView = 'TFL';
             } else {
                 // 現在のビューがTop-Front-Leftなら、Top-Front-Rightへ切り替え
-                newPosition.set(100, 100, 300); // 右上奥からの視点 (初期値)
+                newPosition.set(200, 200, 600); // 右上奥からの視点 (初期値、調整済み)
                 console.log("カメラビューをTop-Front-Rightに変更します。");
                 currentView = 'TFR';
             }
