@@ -2,13 +2,14 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Rubik's Cube Simulator</title>
     <style>
         body {
             margin: 0;
             overflow: hidden; /* スクロールバーを非表示にする */
             display: flex;
+            flex-direction: column; /* 縦方向に要素を並べる */
             font-family: Arial, sans-serif;
             background-color: #222;
             color: #eee;
@@ -16,6 +17,7 @@
 
         canvas {
             display: block;
+            flex-grow: 1; /* 画面の残りのスペースを埋める */
         }
 
         #info {
@@ -26,7 +28,8 @@
             padding: 15px;
             border-radius: 8px;
             z-index: 10;
-            font-size: 0.9em; /* 説明文のフォントサイズを小さくする */
+            font-size: 0.9em;
+            max-width: 90%; /* モバイルでの表示幅を制限 */
         }
 
         #info h1 {
@@ -34,7 +37,6 @@
             color: #fff;
         }
 
-        /* details/summary のデフォルトスタイル調整 */
         #info details {
             margin-top: 10px;
             border: none;
@@ -42,10 +44,10 @@
 
         #info summary {
             cursor: pointer;
-            outline: none; /* フォーカス時のアウトラインを削除 */
+            outline: none;
             padding: 5px 0;
             font-weight: bold;
-            color: #ccc; /* サマリーのテキスト色を調整 */
+            color: #ccc;
         }
 
         #info summary:hover {
@@ -55,11 +57,46 @@
         #info ul {
             list-style: none;
             padding: 0;
-            margin: 10px 0 0 0; /* 折り畳み解除時のリストの余白 */
+            margin: 10px 0 0 0;
         }
 
         #info li {
             margin-bottom: 5px;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+            z-index: 10;
+            display: flex;
+            gap: 10px; /* ボタン間の隙間 */
+            flex-wrap: wrap; /* ボタンが多ければ折り返す */
+            justify-content: center;
+        }
+
+        #controls button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            flex: 1 1 auto; /* フレックスアイテムのサイズ調整 */
+            min-width: 80px; /* 最小幅 */
+        }
+
+        #controls button:hover {
+            background-color: #0056b3;
+        }
+
+        #controls button:active {
+            background-color: #004085;
         }
     </style>
 </head>
@@ -67,7 +104,7 @@
     <div id="info">
         <h1>Rubik's Cube Simulator</h1>
         <details>
-            <summary>テンキーで操作してください:</summary>
+            <summary>操作説明 (テンキー):</summary>
             <ul>
                 <li><b>9-9, 3-9</b>: Right面 90度時計回転</li>
                 <li><b>3-3, 9-3</b>: Right面 90度反時計回転</li>
@@ -99,445 +136,475 @@
         </details>
         <p>※連続してキーを入力してください。</p>
     </div>
+
+    <div id="controls">
+        <button id="shuffleBtn">シャッフル</button>
+        <button id="undoBtn">アンドゥ</button>
+        <button id="cameraBtn">視点切り替え</button>
+        <button id="logBtn">状態ログ</button>
+    </div>
+
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
     <script>
         // --- シーンの初期設定 ---
         const scene = new THREE.Scene();
-        // 直交投影カメラを使用し、ウィンドウサイズに合わせて設定
         const camera = new THREE.OrthographicCamera(window.innerWidth / -2, window.innerWidth / 2, window.innerHeight / 2, window.innerHeight / -2, 1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true }); // アンチエイリアスを有効に
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // カメラの初期位置をTop-Front-Rightのアイソメトリックビューに設定
+        // キューブ全体を回転させるためのpivotオブジェクトを追加
+        const pivot = new THREE.Object3D();
+        scene.add(pivot);
+
         camera.position.set(100, 100, 300);
-        camera.lookAt(0, 0, 0); // 原点を見るように設定
+        camera.lookAt(0, 0, 0);
 
         // --- 光源の追加 ---
-        const ambientLight = new THREE.AmbientLight(0x808080); // シーン全体を均一に照らす環境光
+        const ambientLight = new THREE.AmbientLight(0x808080);
         scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5); // 特定方向から照らす平行光源 (太陽光のようなもの)
-        // 光源の位置を調整して、より正面から当たるようにする
-        directionalLight.position.set(0, 0, 500); // Z座標を大きくし、X, Yを0に近づけることで正面からの光を強調
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        directionalLight.position.set(0, 0, 500);
         scene.add(directionalLight);
 
         // --- ルービックキューブの色の定義 ---
         const colors = {
-            'white': 0xffffff,
-            'yellow': 0xffff00,
-            'red': 0xff0000,
-            'orange': 0xffa500,
-            'blue': 0x0000ff,
-            'green': 0x00ff00,
-            'gray': 0x333333 // キューブレットの内側の見えない面の色
+            'white': 0xffffff, 'yellow': 0xffff00, 'red': 0xff0000,
+            'orange': 0xffa500, 'blue': 0x0000ff, 'green': 0x00ff00,
+            'gray': 0x333333
         };
 
-        // デバッグ表示用の色の略称
         const colorAliases = {
-            [colors.white]: 'W', // White
-            [colors.yellow]: 'Y', // Yellow
-            [colors.red]: 'R', // Red
-            [colors.orange]: 'O', // Orange
-            [colors.blue]: 'B', // Blue
-            [colors.green]: 'G', // Green
-            [colors.gray]: ' '  // Gray (内側は空白で表示)
+            [colors.white]: 'W', [colors.yellow]: 'Y', [colors.red]: 'R',
+            [colors.orange]: 'O', [colors.blue]: 'B', [colors.green]: 'G',
+            [colors.gray]: ' '
         };
 
-        const cubelets = []; // 全てのキューブレットを格納する配列
-        const cubeSize = 50; // 各キューブレットの一辺のサイズ
-        const gap = 2; // キューブレット間の隙間
+        const cubelets = [];
+        const cubeSize = 50;
+        const gap = 2;
 
         // --- 個々のキューブレット (ミニキューブ) の作成 ---
         for (let x = -1; x <= 1; x++) {
             for (let y = -1; y <= 1; y++) {
                 for (let z = -1; z <= 1; z++) {
                     const geometry = new THREE.BoxGeometry(cubeSize, cubeSize, cubeSize);
-                    // 各面の初期色を設定（X, Y, Z座標に基づいて色を決定）
                     const materials = [
-                        new THREE.MeshLambertMaterial({ color: (x === 1) ? colors.orange : colors.gray }), // Right (+X)
-                        new THREE.MeshLambertMaterial({ color: (x === -1) ? colors.red : colors.gray }),    // Left (-X)
-                        new THREE.MeshLambertMaterial({ color: (y === 1) ? colors.white : colors.gray }),    // Top (+Y)
-                        new THREE.MeshLambertMaterial({ color: (y === -1) ? colors.yellow : colors.gray }),  // Bottom (-Y)
-                        new THREE.MeshLambertMaterial({ color: (z === 1) ? colors.blue : colors.gray }),     // Front (+Z)
-                        new THREE.MeshLambertMaterial({ color: (z === -1) ? colors.green : colors.gray })    // Back (-Z)
+                        new THREE.MeshLambertMaterial({ color: (x === 1) ? colors.orange : colors.gray }),
+                        new THREE.MeshLambertMaterial({ color: (x === -1) ? colors.red : colors.gray }),
+                        new THREE.MeshLambertMaterial({ color: (y === 1) ? colors.white : colors.gray }),
+                        new THREE.MeshLambertMaterial({ color: (y === -1) ? colors.yellow : colors.gray }),
+                        new THREE.MeshLambertMaterial({ color: (z === 1) ? colors.blue : colors.gray }),
+                        new THREE.MeshLambertMaterial({ color: (z === -1) ? colors.green : colors.gray })
                     ];
                     const cubelet = new THREE.Mesh(geometry, materials);
-                    // キューブレットの位置を設定（中央のキューブを原点とする）
                     cubelet.position.set(x * (cubeSize + gap), y * (cubeSize + gap), z * (cubeSize + gap));
-                    scene.add(cubelet);
+                    pivot.add(cubelet); // キューブレットをpivotの子として追加
                     cubelets.push(cubelet);
                 }
             }
         }
 
-        // --- キー入力処理 ---
-        let firstKey = null; // 1回目のキー入力
-        let lastKeyPressTime = 0; // 最後のキー入力時刻
-        const KEY_TIMEOUT = 500; // 2ストローク入力のタイムアウト時間 (ms)
+        // --- キー入力処理 (既存のテンキー操作はそのまま残します) ---
+        let firstKey = null;
+        let lastKeyPressTime = 0;
+        const KEY_TIMEOUT = 500;
 
         window.addEventListener('keydown', (event) => {
             const currentTime = Date.now();
             const key = event.key;
 
-            // テンキーの数字（0-9）であるかチェック
             if (key >= '0' && key <= '9') {
                 if (firstKey === null || (currentTime - lastKeyPressTime > KEY_TIMEOUT)) {
-                    // 1回目の入力、またはタイムアウト後の新たな入力として記録
                     firstKey = key;
                 } else {
-                    // 2回目の入力。2ストローク操作を実行
                     const operation = firstKey + '-' + key;
-                    console.log("Operation:", operation);
+                    console.log("Operation (Keypad):", operation);
 
-                    if (operation === '0-2') { // キューブ状態出力 (変更箇所)
-                        logCubeState();
-                    } else if (operation === '0-1') { // シャッフル機能
-                        shuffleCube();
-                    } else if (operation === '0-0') { // アンドゥ機能 (変更箇所)
-                        undoLastMove();
-                    } else if (operation === '5-5') { // カメラ視点変更
-                        changeCameraView();
-                    }
-                    else {
-                        // ルービックキューブの回転操作を実行
-                        performRotation(operation);
-                    }
-                    firstKey = null; // 2ストローク完了後、キー入力をリセット
+                    if (operation === '0-2') { logCubeState(); }
+                    else if (operation === '0-1') { shuffleCube(); }
+                    else if (operation === '0-0') { undoLastMove(); }
+                    else if (operation === '5-5') { changeCameraView(); }
+                    else { performRotation(operation); }
+                    firstKey = null;
                 }
-                lastKeyPressTime = currentTime; // 最終入力時刻を更新
+                lastKeyPressTime = currentTime;
             } else {
-                // テンキー以外のキーが押されたら、2ストローク入力状態をリセット
                 firstKey = null;
             }
         });
 
+
+        // --- タッチ操作関連変数 ---
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchCurrentX = 0;
+        let touchCurrentY = 0;
+        let cubeletTouched = null; // タッチ開始時に触れたキューブレット
+        let rotationAxis = new THREE.Vector3();
+        let targetRotationAngle = 0;
+        let currentRotationAngle = 0;
+        const rotationSpeed = Math.PI / 15;
+        let isRotating = false;
+        let isDraggingWholeCube = false; // キューブ全体をドラッグ中か
+        const swipeThreshold = 30; // スワイプと認識する最低距離（ピクセル）
+        const dragRotationSpeed = 0.005; // ドラッグによるキューブ全体回転の速度
+
+        // --- タッチイベントリスナー ---
+        window.addEventListener('touchstart', (event) => {
+            event.preventDefault(); // スクロールやピンチズームを防ぐ
+
+            if (isRotating || isCameraAnimating || isShuffling || isUndoing) return;
+
+            if (event.touches.length === 1) {
+                touchStartX = event.touches[0].clientX;
+                touchStartY = event.touches[0].clientY;
+                touchCurrentX = touchStartX;
+                touchCurrentY = touchStartY;
+
+                // Raycasterを使って、タッチした位置にあるキューブレットを特定
+                const mouse = new THREE.Vector2();
+                mouse.x = (touchStartX / window.innerWidth) * 2 - 1;
+                mouse.y = -(touchStartY / window.innerHeight) * 2 + 1;
+
+                const raycaster = new THREE.Raycaster();
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(cubelets);
+
+                if (intersects.length > 0) {
+                    // タッチされたオブジェクトがキューブレットの場合
+                    cubeletTouched = intersects[0].object;
+                    isDraggingWholeCube = false; // キューブレットを触っているので全体ドラッグではない
+                } else {
+                    // キューブレット以外をタッチした場合（背景をドラッグして全体回転）
+                    cubeletTouched = null;
+                    isDraggingWholeCube = true;
+                }
+            }
+            // TODO: マルチタッチでの操作 (ピンチズームなど)
+        });
+
+        window.addEventListener('touchmove', (event) => {
+            event.preventDefault(); // スクロールを防ぐ
+
+            if (isRotating || isCameraAnimating || isShuffling || isUndoing) return;
+
+            if (event.touches.length === 1) {
+                const newTouchX = event.touches[0].clientX;
+                const newTouchY = event.touches[0].clientY;
+
+                if (isDraggingWholeCube) {
+                    // キューブ全体をドラッグで回転
+                    const deltaX = newTouchX - touchCurrentX;
+                    const deltaY = newTouchY - touchCurrentY;
+
+                    // Y軸周りの回転 (横ドラッグ)
+                    pivot.rotation.y += deltaX * dragRotationSpeed;
+                    // X軸周りの回転 (縦ドラッグ) - カメラの傾きを考慮
+                    // 注意: 直交投影カメラとpivot回転の組み合わせは複雑になるため、ここではシンプルに実装。
+                    // ユーザーの視点によっては回転方向が直感的でない場合も。
+                    pivot.rotation.x += deltaY * dragRotationSpeed;
+
+                    touchCurrentX = newTouchX;
+                    touchCurrentY = newTouchY;
+                }
+            }
+        });
+
+        window.addEventListener('touchend', (event) => {
+            if (isRotating || isCameraAnimating || isShuffling || isUndoing) return;
+
+            if (event.changedTouches.length === 1) {
+                const touchEndX = event.changedTouches[0].clientX;
+                const touchEndY = event.changedTouches[0].clientY;
+
+                const deltaX = touchEndX - touchStartX;
+                const deltaY = touchEndY - touchStartY;
+
+                if (cubeletTouched && (Math.abs(deltaX) > swipeThreshold || Math.abs(deltaY) > swipeThreshold)) {
+                    // キューブレットをスワイプした場合
+                    performSwipeRotation(cubeletTouched, deltaX, deltaY);
+                }
+            }
+            cubeletTouched = null;
+            isDraggingWholeCube = false;
+        });
+
+        // スワイプによる回転を判定し、performRotationを呼び出す関数
+        function performSwipeRotation(touchedCubelet, deltaX, deltaY) {
+            // スワイプ方向の特定
+            const isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY);
+            let operation = null;
+
+            // タッチされたキューブレットの論理的なグリッド座標を取得
+            const worldPosition = new THREE.Vector3();
+            touchedCubelet.getWorldPosition(worldPosition);
+            const gridX = Math.round(worldPosition.x / (cubeSize + gap));
+            const gridY = Math.round(worldPosition.y / (cubeSize + gap));
+            const gridZ = Math.round(worldPosition.z / (cubeSize + gap));
+
+            // 現在のカメラの向きも考慮に入れるとより正確だが、今回はシンプルに固定視点と仮定
+            // カメラの視点から見たキューブの「手前」「右」「上」を仮定して操作を割り当てる
+
+            if (isHorizontalSwipe) { // 横方向のスワイプ
+                if (gridY === 1) { // Top面付近
+                    operation = (deltaX > 0) ? '7-9' : '9-7'; // U or U'
+                } else if (gridY === -1) { // Bottom面付近
+                    operation = (deltaX > 0) ? '3-1' : '1-3'; // D' or D (逆方向)
+                } else if (gridZ === 1) { // Front面付近
+                    // Front面で横スワイプ (FrontのU or D'のような操作)
+                    // この操作は単純な面回転に直接マッピングしにくいが、今回はF面操作の類似として
+                    // Y軸での中央列操作として扱える可能性もある (5-7, 5-1)
+                    // ここでは Front面に関連するZ軸回転にマッピング
+                    // FまたはF'にマッピング (スワイプ方向と画面上の向きで調整)
+                    // 仮にFront面を時計回りにするには '7-8', 反時計回りにするには '9-8'
+                    // 通常、ユーザーが正面から見て横にスワイプすると、Front面が水平に動くと期待する
+                    // Top層のFront面で横スワイプ: UかU'にマッピングするのが自然
+                    // Middle層のFront面で横スワイプ: MかM'にマッピング (このコードにはMの直接操作はない)
+                    // Bottom層のFront面で横スワイプ: DかD'にマッピング
+                    // ここでは簡易的に、Front面を横スワイプしたら、Front面のキーとみなす
+                    operation = (deltaX > 0) ? '7-8' : '9-8'; // F or F' (仮)
+                }
+                // --- 中央列の回転のアイデア（長押し+スワイプなど、より高度な実装で） ---
+                // if (gridX === 0 && gridZ === 1) { // 中央キューブレット付近を水平スワイプ
+                //     operation = (deltaX > 0) ? '5-7' : '5-1'; // 中央Z列回転
+                // }
+
+            } else { // 縦方向のスワイプ
+                if (gridX === 1) { // Right面付近
+                    operation = (deltaY < 0) ? '9-9' : '3-3'; // R or R'
+                } else if (gridX === -1) { // Left面付近
+                    operation = (deltaY < 0) ? '1-1' : '7-7'; // L' or L (逆方向)
+                } else if (gridZ === 1) { // Front面付近
+                    // Front面を縦スワイプ (RかLのような操作)
+                    // 通常、ユーザーが正面から見て縦にスワイプすると、RかL面が垂直に動くと期待する
+                    // ここではRight面に関連するX軸回転にマッピング (Left面に触れていればLeft面)
+                    // Front面とRight面が交わるエッジキューブを縦にスワイプしたら、Right面にマッピング
+                    // Front面とLeft面が交わるエッジキューブを縦にスワイプしたら、Left面にマッピング
+                    // 中央列の縦回転 (M or M') もここに含められる
+                    // ここでは簡易的に、Front面を縦スワイプしたら、Right面に関連するキーとみなす
+                    operation = (deltaY < 0) ? '9-9' : '3-3'; // R or R' (仮)
+                }
+                // --- 中央列の回転のアイデア（長押し+スワイプなど） ---
+                // if (gridY === 0 && gridZ === 1) { // 中央キューブレット付近を縦スワイプ
+                //     operation = (deltaY > 0) ? '8-8' : '8-2'; // 中央X列回転
+                // }
+            }
+
+            if (operation) {
+                performRotation(operation, 'user');
+            } else {
+                console.log("スワイプ操作が特定できませんでした。");
+            }
+        }
+
+
         // --- 回転処理のためのグループと状態変数 ---
-        let rotatingGroup = new THREE.Group(); // 回転するキューブレットを一時的にまとめるグループ
-        let isRotating = false; // 現在回転中かどうか
-        let rotationAxis = new THREE.Vector3(); // 回転軸
-        let targetRotationAngle = 0; // 目標の回転角度
-        let currentRotationAngle = 0; // 現在のアニメーション回転角度
-        const rotationSpeed = Math.PI / 15; // 1フレームあたりの回転速度 (シャッフルやアンドゥのために少し速くする)
+        let rotatingGroup = new THREE.Group();
+        // let isRotating = false; // 上で定義済み
+        // let rotationAxis = new THREE.Vector3(); // 上で定義済み
+        // let targetRotationAngle = 0; // 上で定義済み
+        // let currentRotationAngle = 0; // 上で定義済み
+        // const rotationSpeed = Math.PI / 15; // 上で定義済み
 
         // --- カメラアニメーションのための変数 ---
-        let targetCameraPosition = camera.position.clone(); // カメラの目標位置
-        let targetCameraQuaternion = camera.quaternion.clone(); // カメラの目標クォータニオン (向き)
-        let isCameraAnimating = false; // 現在カメラがアニメーション中かどうか
-        const cameraAnimationSpeed = 0.3; // カメラアニメーションの補間速度 (0.0: 遅い - 1.0: 速い)
-        let currentView = 'TFR'; // 現在のカメラビュー ('TFR': Top-Front-Right, 'TFL': Top-Front-Left)
+        let targetCameraPosition = camera.position.clone();
+        let targetCameraQuaternion = camera.quaternion.clone();
+        let isCameraAnimating = false;
+        const cameraAnimationSpeed = 0.3;
+        let currentView = 'TFR';
 
         // --- シャッフルとアンドゥのための履歴管理 ---
-        const moveHistory = []; // 実行された操作の履歴
-        let shuffleQueue = []; // シャッフル中に実行する操作のキュー
-        let isShuffling = false; // シャッフル中かどうか
-        let isUndoing = false; // アンドゥ中かどうか
+        const moveHistory = [];
+        let shuffleQueue = [];
+        let isShuffling = false;
+        let isUndoing = false;
 
 
-        // 指定された操作に基づいてルービックキューブの回転を実行する関数
-        // source: 'user', 'shuffle', 'undo' のいずれか。履歴記録の判断に使う
         function performRotation(operation, source = 'user') {
-            // 回転中またはカメラアニメーション中は、新しい操作を受け付けない
-            // ただし、シャッフルやアンドゥ操作自体は回転アニメーションを待つ
             if (isRotating || isCameraAnimating) {
                 if (source === 'shuffle' || source === 'undo') {
-                    // シャッフルやアンドゥ中に呼ばれた場合は、現在の回転が完了するまで待機
                     return;
                 } else {
-                    // ユーザーによる通常の操作の場合は、回転中なら無視
                     return;
                 }
             }
 
-            let axis = new THREE.Vector3(); // 回転軸
-            let angle = 0; // 回転角度
-            let selectAll = false; // 全てのキューブレットを回転させるかどうかのフラグ
+            let axis = new THREE.Vector3();
+            let angle = 0;
+            let selectAll = false;
 
             switch (operation) {
                 // --- 面の回転 (Right, Front, Top, Left, Bottom) ---
-                case '9-9': // Right面 90度時計回転
-                case '3-9': // (追加) 9-9と同じ操作
-                    axis.set(1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(1, null, null);
-                    break;
-                case '3-3': // Right面 90度反時計回転
-                case '9-3': // (追加) 3-3と同じ操作
-                    axis.set(1, 0, 0); angle = Math.PI / 2; selectCubeletsByPosition(1, null, null);
-                    break;
-                case '7-8': // Front面 時計方向に90度回転
-                case '8-9':
-                case '9-6':
-                case '6-3':
-                case '3-2':
-                case '2-1':
-                case '1-4':
-                case '4-7':
-                    axis.set(0, 0, 1); angle = -Math.PI / 2; selectCubeletsByPosition(null, null, 1);
-                    break;
-                case '9-8': // Front面 反時計方向に90度回転
-                case '8-7':
-                case '7-4':
-                case '4-1':
-                case '1-2':
-                case '2-3':
-                case '3-6':
-                case '6-9':
-                    axis.set(0, 0, 1); angle = Math.PI / 2; selectCubeletsByPosition(null, null, 1);
-                    break;
-                case '7-9': // Top面 90度時計回転
-                    axis.set(0, 1, 0); angle = Math.PI / 2; selectCubeletsByPosition(null, 1, null);
-                    break;
-                case '9-7': // Top面 90度反時計回転
-                    axis.set(0, 1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, 1, null);
-                    break;
-                case '7-7': // Left面 90度時計回転
-                case '1-7': // (追加) 7-7と同じ操作
-                    axis.set(-1, 0, 0); angle = Math.PI / 2; selectCubeletsByPosition(-1, null, null);
-                    break;
-                case '1-1': // Left面 90度反時計回転
-                case '7-1': // (追加) 1-1と同じ操作
-                    axis.set(-1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(-1, null, null);
-                    break;
-                case '1-3': // Bottom面 90度時計回転
-                    axis.set(0, -1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, -1, null);
-                    break;
-                case '3-1': // Bottom面 90度反時計回転
-                    axis.set(0, -1, 0); angle = Math.PI / 2; selectCubeletsByPosition(null, -1, null);
-                    break;
+                case '9-9': case '3-9': axis.set(1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(1, null, null); break;
+                case '3-3': case '9-3': axis.set(1, 0, 0); angle = Math.PI / 2; selectCubeletsByPosition(1, null, null); break;
+                case '7-8': case '8-9': case '9-6': case '6-3': case '3-2': case '2-1': case '1-4': case '4-7': axis.set(0, 0, 1); angle = -Math.PI / 2; selectCubeletsByPosition(null, null, 1); break;
+                case '9-8': case '8-7': case '7-4': case '4-1': case '1-2': case '2-3': case '3-6': case '6-9': axis.set(0, 0, 1); angle = Math.PI / 2; selectCubeletsByPosition(null, null, 1); break;
+                case '7-9': axis.set(0, 1, 0); angle = Math.PI / 2; selectCubeletsByPosition(null, 1, null); break;
+                case '9-7': axis.set(0, 1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, 1, null); break;
+                case '7-7': case '1-7': axis.set(-1, 0, 0); angle = Math.PI / 2; selectCubeletsByPosition(-1, null, null); break;
+                case '1-1': case '7-1': axis.set(-1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(-1, null, null); break;
+                case '1-3': axis.set(0, -1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, -1, null); break;
+                case '3-1': axis.set(0, -1, 0); angle = Math.PI / 2; selectCubeletsByPosition(null, -1, null); break;
 
                 // --- キューブ全体の回転 (各軸周り) ---
-                case '5-2': // キューブ全体 X軸正方向 +90度
-                case '8-5':
-                    axis.set(1, 0, 0); angle = Math.PI / 2; selectAll = true;
-                    break;
-                case '5-8': // キューブ全体 X軸正方向 -90度
-                case '2-5':
-                    axis.set(1, 0, 0); angle = -Math.PI / 2; selectAll = true;
-                    break;
-                case '5-4': // キューブ全体 Y軸正方向 -90度
-                case '6-5':
-                    axis.set(0, 1, 0); angle = -Math.PI / 2; selectAll = true;
-                    break;
-                case '5-6': // キューブ全体 Y軸正方向 +90度
-                case '4-5':
-                    axis.set(0, 1, 0); angle = Math.PI / 2; selectAll = true;
-                    break;
-                case '8-6': // キューブ全体 Z軸正方向 -90度
-                case '6-2':
-                case '2-4':
-                case '4-8':
-                    axis.set(0, 0, 1); angle = -Math.PI / 2; selectAll = true;
-                    break;
-                case '8-4': // キューブ全体 Z軸正方向 +90度
-                case '4-2':
-                case '2-6':
-                case '6-8':
-                    axis.set(0, 0, 1); angle = Math.PI / 2; selectAll = true;
-                    break;
+                case '5-2': case '8-5': axis.set(1, 0, 0); angle = Math.PI / 2; selectAll = true; break;
+                case '5-8': case '2-5': axis.set(1, 0, 0); angle = -Math.PI / 2; selectAll = true; break;
+                case '5-4': case '6-5': axis.set(0, 1, 0); angle = -Math.PI / 2; selectAll = true; break;
+                case '5-6': case '4-5': axis.set(0, 1, 0); angle = Math.PI / 2; selectAll = true; break;
+                case '8-6': case '6-2': case '2-4': case '4-8': axis.set(0, 0, 1); angle = -Math.PI / 2; selectAll = true; break;
+                case '8-4': case '4-2': case '2-6': case '6-8': axis.set(0, 0, 1); angle = Math.PI / 2; selectAll = true; break;
 
                 // --- 中央列の回転 ---
-                case '8-8': // 中央X列 (X=0) を時計回転 (X軸正方向から見て反時計回り)
-                case '2-8':
-                    axis.set(1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(0, null, null);
-                    break;
-                case '8-2': // 中央X列 (X=0) を反時計回転 (X軸正方向から見て時計回り)
-                case '2-2':
-                    axis.set(1, 0, 0); angle = Math.PI / 2; selectCubeletsByPosition(0, null, null);
-                    break;
-                case '6-6': // 中央Y列 (Y=0) を時計回転 (Y軸正方向から見て時計回り)
-                case '4-6':
-                    axis.set(0, 1, 0); angle = Math.PI / 2; selectCubeletsByPosition(null, 0, null);
-                    break;
-                case '4-4': // 中央Y列 (Y=0) を反時計回転 (Y軸正方向から見て反時計回り)
-                case '6-4':
-                    axis.set(0, 1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, 0, null);
-                    break;
-                case '5-7': // Z=0面を時計回転 (Front面基準)
-                    axis.set(0, 0, 1); angle = -Math.PI / 2; selectCubeletsByPosition(null, null, 0);
-                    break;
-                case '5-1': // Z=0面を反時計回転 (Front面基準)
-                    axis.set(0, 0, 1); angle = Math.PI / 2; selectCubeletsByPosition(null, null, 0);
-                    break;
+                case '8-8': case '2-8': axis.set(1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(0, null, null); break;
+                case '8-2': case '2-2': axis.set(1, 0, 0); angle = Math.PI / 2; selectCubeletsByPosition(0, null, null); break;
+                case '6-6': case '4-6': axis.set(0, 1, 0); angle = Math.PI / 2; selectCubeletsByPosition(null, 0, null); break;
+                case '4-4': case '6-4': axis.set(0, 1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, 0, null); break;
+                case '5-7': axis.set(0, 0, 1); angle = -Math.PI / 2; selectCubeletsByPosition(null, null, 0); break;
+                case '5-1': axis.set(0, 0, 1); angle = Math.PI / 2; selectCubeletsByPosition(null, null, 0); break;
 
-
-                default:
-                    console.log("不明な操作:", operation);
-                    return; // 処理を中断
+                default: console.log("不明な操作:", operation); return;
             }
 
-            // 履歴への追加は、アンドゥ操作でない場合に行う
-            if (source !== 'undo') { 
+            if (source !== 'undo') {
                 moveHistory.push(operation);
                 console.log("履歴に追加:", operation);
             }
 
-            // キューブ全体を回転させる場合は、全てのキューブレットを選択
             if (selectAll) {
-                selectCubeletsByPosition(null, null, null); // 全てのキューブレットを選択
+                selectCubeletsByPosition(null, null, null);
             }
 
-            // 回転アニメーションの初期設定
             rotationAxis.copy(axis);
             targetRotationAngle = angle;
             currentRotationAngle = 0;
             isRotating = true;
         }
 
-        // 指定された軸位置のキューブレットを選択し、回転グループに追加する関数
         function selectCubeletsByPosition(xVal, yVal, zVal) {
-            rotatingGroup = new THREE.Group(); // 新しい回転グループを初期化
-
-            // 条件に合うキューブレットをフィルタリング
-            const selectedCubelets = cubelets.filter(cubelet => {
-                cubelet.updateMatrixWorld(); // 最新のワールド行列を計算
+            // pivotから回転するキューブレットを外し、rotatingGroupに一時的に追加
+            for (let i = cubelets.length - 1; i >= 0; i--) {
+                const cubelet = cubelets[i];
+                cubelet.updateMatrixWorld();
                 const worldPosition = new THREE.Vector3();
-                cubelet.getWorldPosition(worldPosition); // キューブレットのワールド座標を取得
+                cubelet.getWorldPosition(worldPosition);
 
-                const tolerance = (cubeSize + gap) / 2; // 位置比較の許容誤差
+                const tolerance = (cubeSize + gap) / 2;
 
-                // 各軸の値が指定されている場合は、その軸の位置が条件を満たすかチェック
                 const inX = xVal === null || Math.abs(worldPosition.x - xVal * (cubeSize + gap)) < tolerance;
                 const inY = yVal === null || Math.abs(worldPosition.y - yVal * (cubeSize + gap)) < tolerance;
                 const inZ = zVal === null || Math.abs(worldPosition.z - zVal * (cubeSize + gap)) < tolerance;
 
-                return inX && inY && inZ; // 全ての条件を満たすキューブレットを選択
-            });
-
-            // 選択されたキューブレットをシーンから外し、回転グループの子として追加
-            selectedCubelets.forEach(cubelet => {
-                scene.remove(cubelet);
-                rotatingGroup.add(cubelet);
-            });
-            scene.add(rotatingGroup); // 回転グループをシーンに追加
+                if (inX && inY && inZ) {
+                    pivot.remove(cubelet); // pivotから一時的に削除
+                    rotatingGroup.add(cubelet);
+                }
+            }
+            scene.add(rotatingGroup); // rotatingGroupをシーンに追加
         }
 
-        // 回転完了後にキューブレットのワールド位置と回転を更新し、シーンに再配置する関数
-        // source: 'user', 'shuffle', 'undo' のいずれか。次の操作の判断に使う
+        /**
+         * @attention ここから修正箇所
+         */
         function updateCubeletPositions(source = 'user') {
-            // 回転グループ内の全ての子キューブレットを処理
+            // pivotのワールド行列を取得し、その逆行列を計算
+            const pivotWorldMatrix = pivot.matrixWorld.clone();
+            const inversePivotWorldMatrix = pivotWorldMatrix.invert();
+
             for (let i = rotatingGroup.children.length - 1; i >= 0; i--) {
                 const cubelet = rotatingGroup.children[i];
 
-                // グループの回転が適用された後の、キューブレットのワールド座標と回転を取得
-                rotatingGroup.updateMatrixWorld(true); // グループのワールド行列を更新
-                cubelet.updateMatrixWorld(true);        // キューブレットのワールド行列を更新
-
+                // キューブレットのワールド座標とワールド回転を取得
                 const worldPosition = new THREE.Vector3();
                 cubelet.getWorldPosition(worldPosition);
                 const worldQuaternion = new THREE.Quaternion();
                 cubelet.getWorldQuaternion(worldQuaternion);
 
-                // キューブレット自身の位置と回転をワールド座標/回転で上書き
-                // これにより、シーンの直接の子になってもその状態を維持
-                cubelet.position.copy(worldPosition);
-                cubelet.quaternion.copy(worldQuaternion);
-                cubelet.matrix.identity(); // ローカル行列をリセット
-                // 新しいローカル行列を位置、回転、スケールから再構成
-                cubelet.matrix.compose(cubelet.position, cubelet.quaternion, cubelet.scale);
+                // ワールド座標をpivotのローカル座標に変換
+                worldPosition.applyMatrix4(inversePivotWorldMatrix);
+                // ワールド回転をpivotのローカル回転に変換
+                // pivotの回転を考慮して、キューブレットのローカル回転を求める
+                // worldQ = pivotQ * cubeletQ_local
+                // cubeletQ_local = pivotQ_inverse * worldQ
+                const pivotQuaternionInverse = pivot.quaternion.clone().invert();
+                worldQuaternion.premultiply(pivotQuaternionInverse);
 
-                // --- 精度誤差対策: 位置と回転の丸め込み ---
+
+                // 位置をグリッドにスナップ
                 const gridUnit = (cubeSize + gap);
-                cubelet.position.x = Math.round(cubelet.position.x / gridUnit) * gridUnit;
-                cubelet.position.y = Math.round(cubelet.position.y / gridUnit) * gridUnit;
-                cubelet.position.z = Math.round(cubelet.position.z / gridUnit) * gridUnit;
+                cubelet.position.x = Math.round(worldPosition.x / gridUnit) * gridUnit;
+                cubelet.position.y = Math.round(worldPosition.y / gridUnit) * gridUnit;
+                cubelet.position.z = Math.round(worldPosition.z / gridUnit) * gridUnit;
 
-                // 回転も90度の倍数に丸める
-                const euler = new THREE.Euler().setFromQuaternion(cubelet.quaternion, 'XYZ');
-                euler.x = Math.round(euler.x / (Math.PI / 2)) * (Math.PI / 2);
-                euler.y = Math.round(euler.y / (Math.PI / 2)) * (Math.PI / 2);
-                euler.z = Math.round(euler.z / (Math.PI / 2)) * (Math.PI / 2);
+                // 回転を90度の倍数にスナップ
+                const snapAngle = Math.PI / 2;
+                const euler = new THREE.Euler().setFromQuaternion(worldQuaternion, 'XYZ');
+                euler.x = Math.round(euler.x / snapAngle) * snapAngle;
+                euler.y = Math.round(euler.y / snapAngle) * snapAngle;
+                euler.z = Math.round(euler.z / snapAngle) * snapAngle;
                 cubelet.quaternion.setFromEuler(euler);
-                // --- 精度誤差対策 終わり ---
 
-                scene.add(cubelet); // シーンに直接追加
+                // rotatingGroupから削除し、pivotの子に戻す
+                rotatingGroup.remove(cubelet);
+                pivot.add(cubelet);
             }
+            rotatingGroup.clear(); // rotatingGroupを空にする
+            scene.remove(rotatingGroup); // rotatingGroupをシーンから削除
 
-            rotatingGroup.clear(); // 回転グループから全ての子を削除 (グループは空になる)
-            
-            // cubelets配列を更新し、シーン内の現在のBoxGeometryメッシュを参照するようにする
-            cubelets.length = 0; // 配列をクリア
-            scene.traverse(object => {
-                if (object.isMesh && object.geometry.type === 'BoxGeometry') {
-                    cubelets.push(object);
-                }
-            });
+            isRotating = false;
 
-            isRotating = false; // 回転アニメーション終了
+            /**
+             * @attention 修正箇所ここまで
+             */
 
-            // シャッフル中であれば次の操作を実行
             if (isShuffling && shuffleQueue.length > 0) {
-                // 少し遅延を入れて次の回転を開始 (アニメーションが見やすくなるように)
-                setTimeout(() => {
-                    performRotation(shuffleQueue.shift(), 'shuffle');
-                }, 100); // 100msの遅延
+                setTimeout(() => { performRotation(shuffleQueue.shift(), 'shuffle'); }, 100);
             } else if (isShuffling && shuffleQueue.length === 0) {
                 isShuffling = false;
                 console.log("シャッフル完了！");
             }
 
-            // アンドゥ中であれば次の操作を実行
-            if (isUndoing && shuffleQueue.length > 0) { // シャッフルと同じキューを利用
-                 setTimeout(() => {
-                    performRotation(shuffleQueue.shift(), 'undo'); // アンドゥの逆操作を実行
-                }, 100); // 100msの遅延
+            if (isUndoing && shuffleQueue.length > 0) {
+                 setTimeout(() => { performRotation(shuffleQueue.shift(), 'undo'); }, 100);
             } else if (isUndoing && shuffleQueue.length === 0) {
                 isUndoing = false;
                 console.log("アンドゥ完了！");
             }
         }
 
-        // --- シャッフル機能 ---
-        // 全ての可能な回転操作を定義
         const ALL_FACES = [
-            '9-9', '3-3', // Right
-            '7-8', '9-8', // Front
-            '7-9', '9-7', // Top
-            '7-7', '1-1', // Left
-            '1-3', '3-1', // Bottom
-            '5-2', '5-8', // Cube X
-            '5-4', '5-6', // Cube Y
-            '8-6', '8-4', // Cube Z
-            '8-8', '8-2', // Middle X
-            '6-6', '4-4', // Middle Y
-            '5-7', '5-1'  // Middle Z
+            '9-9', '3-3', '7-8', '9-8', '7-9', '9-7', '7-7', '1-1', '1-3', '3-1',
+            '5-2', '5-8', '5-4', '5-6', '8-6', '8-4', '8-8', '8-2', '6-6', '4-4', '5-7', '5-1'
         ];
 
         async function shuffleCube() {
-            if (isRotating || isShuffling || isUndoing) return; // 回転中やシャッフル中は無視
-
+            if (isRotating || isShuffling || isUndoing) return;
             console.log("シャッフルを開始します...");
             isShuffling = true;
-            shuffleQueue = []; // シャッフル操作のキューをクリア
-
-            const numMoves = 20; // シャッフルする手数
-            // シャッフル操作は、履歴に「個々の回転」として追加される
+            shuffleQueue = [];
+            const numMoves = 20;
             for (let i = 0; i < numMoves; i++) {
-                // ランダムな操作を選択
                 const randomIndex = Math.floor(Math.random() * ALL_FACES.length);
                 shuffleQueue.push(ALL_FACES[randomIndex]);
             }
-            
-            // 最初のシャッフル操作を開始
             performRotation(shuffleQueue.shift(), 'shuffle');
         }
 
-        // --- アンドゥ機能 ---
         function undoLastMove() {
-            if (isRotating || isShuffling || isUndoing) return; // 回転中やシャッフル中は無視
-
+            if (isRotating || isShuffling || isUndoing) return;
             if (moveHistory.length === 0) {
                 console.log("アンドゥできる操作がありません。");
                 return;
             }
-
             console.log("アンドゥを開始します...");
             isUndoing = true;
-            shuffleQueue = []; // アンドゥ操作のキューをクリア（シャッフルと同じキューを利用）
-
-            const lastMove = moveHistory.pop(); // 最後の操作を取り出す
-            const reverseMove = getReverseOperation(lastMove); // その操作の逆を取得
+            shuffleQueue = [];
+            const lastMove = moveHistory.pop();
+            const reverseMove = getReverseOperation(lastMove);
 
             if (reverseMove) {
-                shuffleQueue.push(reverseMove); // 逆操作をキューに追加
-                performRotation(shuffleQueue.shift(), 'undo'); // 逆操作を実行
+                shuffleQueue.push(reverseMove);
+                performRotation(shuffleQueue.shift(), 'undo');
                 console.log(`直前の操作 "${lastMove}" をアンドゥしました。逆操作: "${reverseMove}"`);
             } else {
                 console.log(`逆操作が定義されていません: ${lastMove}`);
@@ -545,17 +612,16 @@
             }
         }
 
-        // 操作の逆操作を取得するヘルパー関数
         function getReverseOperation(operation) {
             switch (operation) {
                 // --- 面の回転 ---
-                case '9-9': return '3-3'; // Right面 90度時計回転の逆
-                case '3-9': return '9-3'; // 3-9 は 9-9 と同じ Right面 90度時計回転なので、逆は 9-3 (3-3でも可だが、対応するキーペアで返す)
-                case '3-3': return '9-9'; // Right面 90度反時計回転の逆
-                case '9-3': return '3-9'; // 9-3 は 3-3 と同じ Right面 90度反時計回転なので、逆は 3-9 (9-9でも可だが、対応するキーペアで返す)
+                case '9-9': return '3-3';
+                case '3-9': return '9-3';
+                case '3-3': return '9-9';
+                case '9-3': return '3-9';
 
-                case '7-8': return '9-8'; // Front面 90度時計回転の逆
-                case '8-9': return '8-7'; // (元の操作を逆方向に回すキーペアで返す)
+                case '7-8': return '9-8';
+                case '8-9': return '8-7';
                 case '9-6': return '6-9';
                 case '6-3': return '3-6';
                 case '3-2': return '2-3';
@@ -563,7 +629,7 @@
                 case '1-4': return '7-4';
                 case '4-7': return '4-1';
 
-                case '9-8': return '7-8'; // Front面 90度反時計回転の逆
+                case '9-8': return '7-8';
                 case '8-7': return '8-9';
                 case '7-4': return '1-4';
                 case '4-1': return '4-7';
@@ -572,246 +638,209 @@
                 case '3-6': return '6-3';
                 case '6-9': return '9-6';
 
-                case '7-9': return '9-7'; // Top面 90度時計回転の逆
-                case '9-7': return '7-9'; // Top面 90度反時計回転の逆
+                case '7-9': return '9-7';
+                case '9-7': return '7-9';
 
-                case '7-7': return '1-1'; // Left面 90度時計回転の逆
-                case '1-7': return '7-1'; // 1-7 は 7-7 と同じ Left面 90度時計回転なので、逆は 7-1 (1-1でも可だが、対応するキーペアで返す)
-                case '1-1': return '7-7'; // Left面 90度反時計回転の逆
-                case '7-1': return '1-7'; // 7-1 は 1-1 と同じ Left面 90度反時計回転なので、逆は 1-7 (7-7でも可だが、対応するキーペアで返す)
+                case '7-7': return '1-1';
+                case '1-7': return '7-1';
+                case '1-1': return '7-7';
+                case '7-1': return '1-7';
 
-                case '1-3': return '3-1'; // Bottom面 90度時計回転の逆
-                case '3-1': return '1-3'; // Bottom面 90度反時計回転の逆
+                case '1-3': return '3-1';
+                case '3-1': return '1-3';
 
                 // --- キューブ全体の回転 ---
-                case '5-2': return '5-8'; // キューブ全体 X軸正方向 +90度の逆
-                case '8-5': return '2-5'; // 8-5 は 5-2 と同じなので、逆は 2-5
-                case '5-8': return '5-2'; // キューブ全体 X軸正方向 -90度の逆
-                case '2-5': return '8-5'; // 2-5 は 5-8 と同じなので、逆は 8-5
+                case '5-2': return '5-8';
+                case '8-5': return '2-5';
+                case '5-8': return '5-2';
+                case '2-5': return '8-5';
 
-                case '5-4': return '5-6'; // キューブ全体 Y軸正方向 -90度の逆
-                case '6-5': return '4-5'; // 6-5 は 5-4 と同じなので、逆は 4-5
-                case '5-6': return '5-4'; // キューブ全体 Y軸正方向 +90度の逆
-                case '4-5': return '6-5'; // 4-5 は 5-6 と同じなので、逆は 6-5
+                case '5-4': return '5-6';
+                case '6-5': return '4-5';
+                case '5-6': return '5-4';
+                case '4-5': return '6-5';
 
-                case '8-6': return '8-4'; // キューブ全体 Z軸正方向 -90度の逆
+                case '8-6': return '8-4';
                 case '6-2': return '2-6';
                 case '2-4': return '4-2';
                 case '4-8': return '6-8';
 
-                case '8-4': return '8-6'; // キューブ全体 Z軸正方向 +90度の逆
+                case '8-4': return '8-6';
                 case '4-2': return '2-4';
                 case '2-6': return '6-2';
                 case '6-8': return '4-8';
 
                 // --- 中央列の回転 ---
-                case '8-8': return '8-2'; // 中央X列 (X=0) 時計回転の逆
-                case '2-8': return '2-2'; // 2-8 は 8-8 と同じなので、逆は 2-2
-                case '8-2': return '8-8'; // 中央X列 (X=0) 反時計回転の逆
-                case '2-2': return '2-8'; // 2-2 は 8-2 と同じなので、逆は 2-8
+                case '8-8': return '8-2';
+                case '2-8': return '2-2';
+                case '8-2': return '8-8';
+                case '2-2': return '2-8';
 
-                case '6-6': return '4-4'; // 中央Y列 (Y=0) 時計回転の逆
-                case '4-6': return '6-4'; // 4-6 は 6-6 と同じなので、逆は 6-4
-                case '4-4': return '6-6'; // 中央Y列 (Y=0) 反時計回転の逆
-                case '6-4': return '4-6'; // 6-4 は 4-4 と同じなので、逆は 4-6
+                case '6-6': return '4-4';
+                case '4-6': return '6-4';
+                case '4-4': return '6-6';
+                case '6-4': return '4-6';
 
-                case '5-7': return '5-1'; // 中央Z列 (Z=0) 時計回転の逆
-                case '5-1': return '5-7'; // 中央Z列 (Z=0) 反時計回転の逆
+                case '5-7': return '5-1';
+                case '5-1': return '5-7';
                 default:
                     console.warn(`Warning: Reverse operation not defined for "${operation}"`);
                     return null;
             }
         }
-        
+
         // --- アニメーションループ ---
         function animate() {
-            requestAnimationFrame(animate); // 次のフレームで再度この関数を呼び出す
+            requestAnimationFrame(animate);
 
             if (isRotating) {
                 let angleStep = rotationSpeed;
-                // 目標角度に近づいたら残りの角度に調整し、回転を終了
                 if (Math.abs(targetRotationAngle - currentRotationAngle) < angleStep) {
                     angleStep = Math.abs(targetRotationAngle - currentRotationAngle);
                     isRotating = false;
                 }
-                // 回転クォータニオンを作成し、回転グループに適用
                 const rotateQuaternion = new THREE.Quaternion();
                 rotateQuaternion.setFromAxisAngle(rotationAxis, targetRotationAngle > currentRotationAngle ? angleStep : -angleStep);
                 rotatingGroup.applyQuaternion(rotateQuaternion);
                 currentRotationAngle += (targetRotationAngle > currentRotationAngle ? angleStep : -angleStep);
 
                 if (!isRotating) {
-                    // isShuffling と isUndoing の状態に基づいて source を決定
                     const source = isShuffling ? 'shuffle' : (isUndoing ? 'undo' : 'user');
-                    updateCubeletPositions(source); 
+                    updateCubeletPositions(source);
                 }
             }
 
-            // --- カメラのアニメーション ---
             if (isCameraAnimating) {
-                // カメラの位置と向きを目標値へ向かって滑らかに補間
                 camera.position.lerp(targetCameraPosition, cameraAnimationSpeed);
                 camera.quaternion.slerp(targetCameraQuaternion, cameraAnimationSpeed);
 
-                // カメラが目標位置と目標向きに十分近づいたらアニメーションを終了
                 if (camera.position.distanceTo(targetCameraPosition) < 0.1 &&
                     camera.quaternion.angleTo(targetCameraQuaternion) < 0.001) {
-                    camera.position.copy(targetCameraPosition); // 完全に目標位置に設定
-                    camera.quaternion.copy(targetCameraQuaternion); // 完全に目標向きに設定
+                    camera.position.copy(targetCameraPosition);
+                    camera.quaternion.copy(targetCameraQuaternion);
                     isCameraAnimating = false;
                     console.log("カメラアニメーション完了。");
                 }
             }
 
-            renderer.render(scene, camera); // シーンをカメラを通して描画
+            renderer.render(scene, camera);
         }
 
-        // ウィンドウのリサイズイベントに対応
         window.addEventListener('resize', () => {
             const width = window.innerWidth;
             const height = window.innerHeight;
 
-            // 直交投影カメラの視野を更新
             camera.left = width / -2;
             camera.right = width / 2;
             camera.top = height / 2;
             camera.bottom = height / -2;
-            camera.updateProjectionMatrix(); // 投影行列を更新
+            camera.updateProjectionMatrix();
 
-            renderer.setSize(width, height); // レンダラーのサイズも更新
+            renderer.setSize(width, height);
         });
 
-        animate(); // アニメーションループを開始
+        animate();
 
-        // --- カメラビュー変更関数 ---
         function changeCameraView() {
-            if (isCameraAnimating || isRotating || isShuffling || isUndoing) return; // アニメーション中は新しい操作を受け付けない
+            if (isCameraAnimating || isRotating || isShuffling || isUndoing) return;
 
             let newPosition = new THREE.Vector3();
-            let newLookAt = new THREE.Vector3(0, 0, 0); // 常に原点を見る
+            let newLookAt = new THREE.Vector3(0, 0, 0);
 
             if (currentView === 'TFR') {
-                // 現在のビューがTop-Front-Rightなら、Top-Front-Leftへ切り替え
-                newPosition.set(-100, 100, 300); // 左上奥からの視点
+                newPosition.set(-100, 100, 300);
                 console.log("カメラビューをTop-Front-Leftに変更します。");
                 currentView = 'TFL';
             } else {
-                // 現在のビューがTop-Front-Leftなら、Top-Front-Rightへ切り替え
-                newPosition.set(100, 100, 300); // 右上奥からの視点 (初期値)
+                newPosition.set(100, 100, 300);
                 console.log("カメラビューをTop-Front-Rightに変更します。");
                 currentView = 'TFR';
             }
 
-            // 目標位置と目標クォータニオンを設定し、アニメーションを開始
             targetCameraPosition.copy(newPosition);
-            const tempCameraForTarget = new THREE.PerspectiveCamera(); // 一時的なカメラで目標の向きを計算
+            const tempCameraForTarget = new THREE.PerspectiveCamera();
             tempCameraForTarget.position.copy(newPosition);
             tempCameraForTarget.lookAt(newLookAt);
             targetCameraQuaternion.copy(tempCameraForTarget.quaternion);
 
-            isCameraAnimating = true; // カメラアニメーションを開始
+            isCameraAnimating = true;
         }
 
-
-        // --- デバッグ用の関数: キューブの現在の状態をコンソールに出力 ---
         function logCubeState() {
             console.log("\n--- Rubik's Cube State ---");
 
-            // 各面の色の状態を保持する配列を初期化（全て空白で埋める）
             const faceStates = {
-                'Top': Array(9).fill(' '),    // White (Y+面)
-                'Bottom': Array(9).fill(' '), // Yellow (Y-面)
-                'Front': Array(9).fill(' '),  // Blue (Z+面)
-                'Back':    Array(9).fill(' '),    // Green (Z-面)
-                'Left':    Array(9).fill(' '),    // Red (X-面)
-                'Right':   Array(9).fill(' ')    // Orange (X+面)
+                'Top': Array(9).fill(' '), 'Bottom': Array(9).fill(' '),
+                'Front': Array(9).fill(' '), 'Back': Array(9).fill(' '),
+                'Left': Array(9).fill(' '), 'Right': Array(9).fill(' ')
             };
 
-            // ワールド座標系における各面の基準方向ベクトル
             const worldAxes = {
-                'Top':    new THREE.Vector3(0, 1, 0),
-                'Bottom': new THREE.Vector3(0, -1, 0),
-                'Front':  new THREE.Vector3(0, 0, 1),
-                'Back':    new THREE.Vector3(0, 0, -1),
-                'Left':    new THREE.Vector3(-1, 0, 0),
-                'Right':   new THREE.Vector3(1, 0, 0)
+                'Top': new THREE.Vector3(0, 1, 0), 'Bottom': new THREE.Vector3(0, -1, 0),
+                'Front': new THREE.Vector3(0, 0, 1), 'Back': new THREE.Vector3(0, 0, -1),
+                'Left': new THREE.Vector3(-1, 0, 0), 'Right': new THREE.Vector3(1, 0, 0)
             };
 
-            const tolerance = 0.01; // 位置やベクトルの比較における許容誤差
+            const tolerance = 0.01;
 
-            // 各キューブレットをループし、それぞれの面の状態を収集
             cubelets.forEach(cubelet => {
-                cubelet.updateMatrixWorld(); // キューブレットのワールド行列を常に最新に更新
+                cubelet.updateMatrixWorld();
 
                 const worldPosition = new THREE.Vector3();
-                cubelet.getWorldPosition(worldPosition); // ワールド座標を取得
+                cubelet.getWorldPosition(worldPosition);
 
-                // ワールド座標をルービックキューブの論理的なグリッド座標 (-1, 0, 1) に変換
                 const currentGridX = Math.round(worldPosition.x / (cubeSize + gap));
                 const currentGridY = Math.round(worldPosition.y / (cubeSize + gap));
                 const currentGridZ = Math.round(worldPosition.z / (cubeSize + gap));
 
-                // 各キューブレットの6面それぞれについて、その面のワールド向きと色をチェック
-                // BoxGeometryの面の順序: Right (+X), Left (-X), Top (+Y), Bottom (-Y), Front (+Z), Back (-Z)
                 const localFaceNormals = [
-                    new THREE.Vector3(1, 0, 0),    // 0: Right (+X)
-                    new THREE.Vector3(-1, 0, 0),   // 1: Left (-X)
-                    new THREE.Vector3(0, 1, 0),    // 2: Top (+Y)
-                    new THREE.Vector3(0, -1, 0),   // 3: Bottom (-Y)
-                    new THREE.Vector3(0, 0, 1),    // 4: Front (+Z)
-                    new THREE.Vector3(0, 0, -1)    // 5: Back (-Z)
+                    new THREE.Vector3(1, 0, 0), new THREE.Vector3(-1, 0, 0),
+                    new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
+                    new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1)
                 ];
 
                 localFaceNormals.forEach((localNormal, materialIndex) => {
                     const worldNormal = localNormal.clone();
-                    worldNormal.applyQuaternion(cubelet.quaternion); // ローカル法線にキューブレットの回転を適用し、ワールド法線に変換
+                    worldNormal.applyQuaternion(cubelet.quaternion);
 
                     const colorCode = cubelet.material[materialIndex].color.getHex();
-                    const colorAlias = colorAliases[colorCode] || '?'; // 定義された色の略称、または不明な場合は'?'
+                    const colorAlias = colorAliases[colorCode] || '?';
 
                     let row, col;
 
-                    // 各面ごとのマッピングロジック (現在のグリッド座標とワールド法線から、どの面のどの位置かを判定)
-                    // Top面 (White): Y+方向を向いているキューブレットの上面
                     if (currentGridY === 1 && worldNormal.dot(worldAxes.Top) > 1 - tolerance) {
-                        row = 1 - currentGridZ; // Z座標を0,1,2にマッピング（手前が上）
-                        col = currentGridX + 1; // X座標を0,1,2にマッピング（左が左）
+                        row = 1 - currentGridZ;
+                        col = currentGridX + 1;
                         faceStates.Top[row * 3 + col] = colorAlias;
                     }
-                    // Bottom面 (Yellow): Y-方向を向いているキューブレットの下面
                     else if (currentGridY === -1 && worldNormal.dot(worldAxes.Bottom) > 1 - tolerance) {
-                        row = currentGridZ + 1; // Z座標を0,1,2にマッピング（奥が上）
-                        col = currentGridX + 1; // X座標を0,1,2にマッピング（左が左）
+                        row = currentGridZ + 1;
+                        col = currentGridX + 1;
                         faceStates.Bottom[row * 3 + col] = colorAlias;
                     }
-                    // Front面 (Blue): Z+方向を向いているキューブレットの前面
                     else if (currentGridZ === 1 && worldNormal.dot(worldAxes.Front) > 1 - tolerance) {
-                        row = 1 - currentGridY; // Y座標を0,1,2にマッピング（上が上）
-                        col = currentGridX + 1; // X座標を0,1,2にマッピング（左が左）
+                        row = 1 - currentGridY;
+                        col = currentGridX + 1;
                         faceStates.Front[row * 3 + col] = colorAlias;
                     }
-                    // Back面 (Green): Z-方向を向いているキューブレットの背面
                     else if (currentGridZ === -1 && worldNormal.dot(worldAxes.Back) > 1 - tolerance) {
-                        row = 1 - currentGridY; // Y座標を0,1,2にマッピング（上が上）
-                        col = 1 - currentGridX; // X座標を0,1,2にマッピング（右が左）
+                        row = 1 - currentGridY;
+                        col = 1 - currentGridX;
                         faceStates.Back[row * 3 + col] = colorAlias;
                     }
-                    // Left面 (Red): X-方向を向いているキューブレットの左面
                     else if (currentGridX === -1 && worldNormal.dot(worldAxes.Left) > 1 - tolerance) {
-                        row = 1 - currentGridY; // Y座標を0,1,2にマッピング（上が上）
-                        col = currentGridZ + 1; // Z座標を0,1,2にマッピング（奥が左）
+                        row = 1 - currentGridY;
+                        col = currentGridZ + 1;
                         faceStates.Left[row * 3 + col] = colorAlias;
                     }
-                    // Right面 (Orange): X+方向を向いているキューブレットの右面
                     else if (currentGridX === 1 && worldNormal.dot(worldAxes.Right) > 1 - tolerance) {
-                        row = 1 - currentGridY; // Y座標を0,1,2にマッピング（上が上）
-                        col = 1 - currentGridZ; // Z座標を0,1,2にマッピング（手前が左）
+                        row = 1 - currentGridY;
+                        col = 1 - currentGridZ;
                         faceStates.Right[row * 3 + col] = colorAlias;
                     }
                 });
             });
 
-            // コンソール出力の整形関数
             const printFace = (name, colorsArr) => {
                 console.log(`--- ${name} ---`);
                 console.log(`${colorsArr[0]}${colorsArr[1]}${colorsArr[2]}`);
@@ -819,7 +848,6 @@
                 console.log(`${colorsArr[6]}${colorsArr[7]}${colorsArr[8]}`);
             };
 
-            // ルービックキューブの標準的な配置順で各面を出力
             printFace('Top (White)', faceStates.Top);
             printFace('Left (Red)', faceStates.Left);
             printFace('Front (Blue)', faceStates.Front);
@@ -829,6 +857,13 @@
 
             console.log("----------------------");
         }
+
+        // --- UIボタンのイベントリスナー設定 ---
+        document.getElementById('shuffleBtn').addEventListener('click', shuffleCube);
+        document.getElementById('undoBtn').addEventListener('click', undoLastMove);
+        document.getElementById('cameraBtn').addEventListener('click', changeCameraView);
+        document.getElementById('logBtn').addEventListener('click', logCubeState);
+
     </script>
 </body>
 </html>
