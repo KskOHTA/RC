@@ -27,7 +27,7 @@
             padding: 15px;
             border-radius: 8px;
             z-index: 10;
-            font-size: 0.5em; /* 説明文のフォントサイズを小さくする */
+            font-size: 0.9em; /* 説明文のフォントサイズを小さくする */
         }
 
         #info h1 {
@@ -122,8 +122,7 @@
     <div id="controls">
         <button id="shuffleButton">シャッフル</button>
         <button id="undoButton">アンドゥ</button>
-        <button id="cameraViewButton">視点切り替え</button>
-        <button id="logStateButton">状態出力</button>
+        <button id="logStateButton" style="display: none;">状態出力</button> <button id="cameraViewButton">視点切り替え</button>
     </div>
 
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
@@ -171,8 +170,8 @@
         };
 
         const cubelets = []; // 全てのキューブレットを格納する配列
-        const cubeSize = 75; // 各キューブレットの一辺のサイズ
-        const gap = 3; // キューブレット間の隙間
+        const cubeSize = 50; // 各キューブレットの一辺のサイズ
+        const gap = 2; // キューブレット間の隙間
         const gridUnit = (cubeSize + gap); // 論理グリッドの単位
 
         // --- 個々のキューブレット (ミニキューブ) の作成 ---
@@ -247,8 +246,8 @@
         let startNumpad = null;
         let lastTapTime = 0;
         let lastTapNumpad = null;
-        const SWIPE_THRESHOLD = 20; // スワイプと認識する最低距離（ピクセル）
-        const DOUBLE_TAP_TIMEOUT = 300; // ダブルタップと認識する時間（ms）
+        const SWIPE_THRESHOLD = 30; // スワイプと認識する最低距離（ピクセル）を緩和
+        const DOUBLE_TAP_TIMEOUT = 400; // ダブルタップと認識する時間（ms）を拡大
 
         // 画面座標からThree.jsのRaycaster用の正規化デバイス座標を取得
         function getNormalizedDeviceCoords(clientX, clientY) {
@@ -312,6 +311,8 @@
             const touchedCubelet = getIntersectedCubelet(touchStartX, touchStartY);
             startNumpad = touchedCubelet ? getLogicalNumpadPosition(touchedCubelet) : null;
             
+            console.log(`touchstart: startNumpad=${startNumpad}`); // デバッグログ追加
+            
             event.preventDefault(); // スクロールを防ぐ
         });
 
@@ -332,6 +333,8 @@
 
             const currentTouchedCubelet = getIntersectedCubelet(touchEndX, touchEndY);
             const endNumpad = currentTouchedCubelet ? getLogicalNumpadPosition(currentTouchedCubelet) : null;
+
+            console.log(`touchend: endNumpad=${endNumpad}, isSwipe=${isSwipe}`); // デバッグログ追加
 
             if (endNumpad === null) {
                 // フロント面のキューブレットに触れていない場合、タップ状態をリセットして終了
@@ -792,6 +795,9 @@
         function animate() {
             requestAnimationFrame(animate); // 次のフレームで再度この関数を呼び出す
 
+            // デバッグログ追加: 現在のアニメーション状態を表示
+            // console.log(`Flags: R=${isRotating}, CA=${isCameraAnimating}, S=${isShuffling}, U=${isUndoing}`);
+
             if (isRotating) {
                 let angleStep = rotationSpeed;
                 // 目標角度に近づいたら残りの角度に調整し、回転を終了
@@ -1000,22 +1006,38 @@
         // --- ボタン要素の取得とイベントリスナーの設定 ---
         const shuffleButton = document.getElementById('shuffleButton');
         const undoButton = document.getElementById('undoButton');
-        const logStateButton = document.getElementById('logStateButton');
+        const logStateButton = document.getElementById('logStateButton'); // nullになる可能性あり
         const cameraViewButton = document.getElementById('cameraViewButton');
 
-        shuffleButton.addEventListener('click', shuffleCube);
-        undoButton.addEventListener('click', undoLastMove);
-        logStateButton.addEventListener('click', logCubeState);
-        cameraViewButton.addEventListener('click', changeCameraView);
+        if (shuffleButton) {
+            shuffleButton.addEventListener('click', shuffleCube);
+        }
+        if (undoButton) {
+            undoButton.addEventListener('click', undoLastMove);
+        }
+        if (logStateButton) { // 存在する場合のみイベントリスナーを設定
+            logStateButton.addEventListener('click', logCubeState);
+        }
+        if (cameraViewButton) {
+            cameraViewButton.addEventListener('click', changeCameraView);
+        }
 
         // ボタンの活性/非活性を制御する関数
         function updateButtonStates() {
             const isAnyAnimationInProgress = isRotating || isCameraAnimating || isShuffling || isUndoing;
 
-            shuffleButton.disabled = isAnyAnimationInProgress;
-            undoButton.disabled = isAnyAnimationInProgress || moveHistory.length === 0;
-            logStateButton.disabled = isAnyAnimationInProgress;
-            cameraViewButton.disabled = isAnyAnimationInProgress;
+            if (shuffleButton) { // 存在を確認
+                shuffleButton.disabled = isAnyAnimationInProgress;
+            }
+            if (undoButton) { // 存在を確認
+                undoButton.disabled = isAnyAnimationInProgress || moveHistory.length === 0;
+            }
+            if (logStateButton) { // 存在を確認
+                logStateButton.disabled = isAnyAnimationInProgress;
+            }
+            if (cameraViewButton) { // 存在を確認
+                cameraViewButton.disabled = isAnyAnimationInProgress;
+            }
         }
 
         // 初期ロード時にボタンの状態を更新
