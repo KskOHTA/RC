@@ -525,57 +525,84 @@
         }
 
         // 操作の逆操作を取得するヘルパー関数
+// 操作の逆操作を取得するヘルパー関数
         function getReverseOperation(operation) {
             switch (operation) {
-                // 面の回転
-                case '9-9':
-                case '3-9': return '3-3'; // 9-9, 3-9 の逆は 3-3, 9-3
-                case '3-3':
-                case '9-3': return '9-9'; // 3-3, 9-3 の逆は 9-9, 3-9
-                case '7-8': return '9-8';
-                case '9-8': return '7-8';
-                case '7-9': return '9-7';
-                case '9-7': return '7-9';
-                case '7-7':
-                case '1-7': return '1-1'; // 7-7, 1-7 の逆は 1-1, 7-1
-                case '1-1':
-                case '7-1': return '7-7'; // 1-1, 7-1 の逆は 7-7, 1-7
-                case '1-3': return '3-1';
-                case '3-1': return '1-3';
+                // --- 面の回転 ---
+                case '9-9': return '3-3'; // Right面 90度時計回転の逆
+                case '3-9': return '9-3'; // 3-9 は 9-9 と同じ Right面 90度時計回転なので、逆は 9-3 (3-3でも可だが、対応するキーペアで返す)
+                case '3-3': return '9-9'; // Right面 90度反時計回転の逆
+                case '9-3': return '3-9'; // 9-3 は 3-3 と同じ Right面 90度反時計回転なので、逆は 3-9 (9-9でも可だが、対応するキーペアで返す)
 
-                // キューブ全体の回転
-                case '5-2':
-                case '8-5': return '5-8'; // 5-2, 8-5 の逆は 5-8, 2-5
-                case '5-8':
-                case '2-5': return '5-2'; // 5-8, 2-5 の逆は 5-2, 8-5
-                case '5-4':
-                case '6-5': return '5-6'; // 5-4, 6-5 の逆は 5-6, 4-5
-                case '5-6':
-                case '4-5': return '5-4'; // 5-6, 4-5 の逆は 5-4, 6-5
-                case '8-6':
-                case '6-2':
-                case '2-4':
-                case '4-8': return '8-4'; // 8-6, 6-2, 2-4, 4-8 の逆は 8-4, 4-2, 2-6, 6-8
-                case '8-4':
-                case '4-2':
-                case '2-6':
-                case '6-8': return '8-6'; // 8-4, 4-2, 2-6, 6-8 の逆は 8-6, 6-2, 2-4, 4-8
+                case '7-8': return '9-8'; // Front面 90度時計回転の逆
+                case '8-9': return '8-7'; // (元の操作を逆方向に回すキーペアで返す)
+                case '9-6': return '6-9';
+                case '6-3': return '3-6';
+                case '3-2': return '2-3';
+                case '2-1': return '1-2';
+                case '1-4': return '7-4';
+                case '4-7': return '4-1';
 
-                // 中央列の回転
-                case '8-8':
-                case '2-8': return '8-2'; // 8-8, 2-8 の逆は 8-2, 2-2
-                case '8-2':
-                case '2-2': return '8-8'; // 8-2, 2-2 の逆は 8-8, 2-8
-                case '6-6':
-                case '4-6': return '4-4'; // 6-6, 4-6 の逆は 4-4, 6-4
-                case '4-4':
-                case '6-4': return '6-6'; // 4-4, 6-4 の逆は 6-6, 4-6
-                case '5-7': return '5-1';
-                case '5-1': return '5-7';
-                default: return null;
+                case '9-8': return '7-8'; // Front面 90度反時計回転の逆
+                case '8-7': return '8-9';
+                case '7-4': return '1-4';
+                case '4-1': return '4-7';
+                case '1-2': return '2-1';
+                case '2-3': return '3-2';
+                case '3-6': return '6-3';
+                case '6-9': return '9-6';
+
+                case '7-9': return '9-7'; // Top面 90度時計回転の逆
+                case '9-7': return '7-9'; // Top面 90度反時計回転の逆
+
+                case '7-7': return '1-1'; // Left面 90度時計回転の逆
+                case '1-7': return '7-1'; // 1-7 は 7-7 と同じ Left面 90度時計回転なので、逆は 7-1 (1-1でも可だが、対応するキーペアで返す)
+                case '1-1': return '7-7'; // Left面 90度反時計回転の逆
+                case '7-1': return '1-7'; // 7-1 は 1-1 と同じ Left面 90度反時計回転なので、逆は 1-7 (7-7でも可だが、対応するキーペアで返す)
+
+                case '1-3': return '3-1'; // Bottom面 90度時計回転の逆
+                case '3-1': return '1-3'; // Bottom面 90度反時計回転の逆
+
+                // --- キューブ全体の回転 ---
+                case '5-2': return '5-8'; // キューブ全体 X軸正方向 +90度の逆
+                case '8-5': return '2-5'; // 8-5 は 5-2 と同じなので、逆は 2-5
+                case '5-8': return '5-2'; // キューブ全体 X軸正方向 -90度の逆
+                case '2-5': return '8-5'; // 2-5 は 5-8 と同じなので、逆は 8-5
+
+                case '5-4': return '5-6'; // キューブ全体 Y軸正方向 -90度の逆
+                case '6-5': return '4-5'; // 6-5 は 5-4 と同じなので、逆は 4-5
+                case '5-6': return '5-4'; // キューブ全体 Y軸正方向 +90度の逆
+                case '4-5': return '6-5'; // 4-5 は 5-6 と同じなので、逆は 6-5
+
+                case '8-6': return '8-4'; // キューブ全体 Z軸正方向 -90度の逆
+                case '6-2': return '2-6';
+                case '2-4': return '4-2';
+                case '4-8': return '6-8';
+
+                case '8-4': return '8-6'; // キューブ全体 Z軸正方向 +90度の逆
+                case '4-2': return '2-4';
+                case '2-6': return '6-2';
+                case '6-8': return '4-8';
+
+                // --- 中央列の回転 ---
+                case '8-8': return '8-2'; // 中央X列 (X=0) 時計回転の逆
+                case '2-8': return '2-2'; // 2-8 は 8-8 と同じなので、逆は 2-2
+                case '8-2': return '8-8'; // 中央X列 (X=0) 反時計回転の逆
+                case '2-2': return '2-8'; // 2-2 は 8-2 と同じなので、逆は 2-8
+
+                case '6-6': return '4-4'; // 中央Y列 (Y=0) 時計回転の逆
+                case '4-6': return '6-4'; // 4-6 は 6-6 と同じなので、逆は 6-4
+                case '4-4': return '6-6'; // 中央Y列 (Y=0) 反時計回転の逆
+                case '6-4': return '4-6'; // 6-4 は 4-4 と同じなので、逆は 4-6
+
+                case '5-7': return '5-1'; // 中央Z列 (Z=0) 時計回転の逆
+                case '5-1': return '5-7'; // 中央Z列 (Z=0) 反時計回転の逆
+                default:
+                    console.warn(`Warning: Reverse operation not defined for "${operation}"`);
+                    return null;
             }
         }
-        
+                
         // --- アニメーションループ ---
         function animate() {
             requestAnimationFrame(animate); // 次のフレームで再度この関数を呼び出す
