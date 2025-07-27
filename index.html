@@ -75,55 +75,381 @@
             background-color: #555;
             cursor: not-allowed;
         }
+
+        /* ここから追加・修正 */
+        summary h2 {
+            display: inline; /* h2要素をインライン表示に設定 */
+            margin: 0; /* h2のデフォルトマージンをリセット */
+            padding: 0; /* h2のデフォルトパディングをリセット */
+        }
+        /* ここまで追加・修正 */
     </style>
 </head>
 <body>
     <div id="info">
-	<h1>Rubik's Cube Simulator</h1>
-        <details> <summary><h2>操作説明</h2></summary>
+        <h1>Rubik's Cube Simulator</h1>
+        <details>
+            <summary>
+                <h2>操作説明</h2>
+            </summary>
             <p>テンキーで操作してください:</p>
             <ul>
-                <li><b>9-9, 3-9</b>: Right面 90度時計回転</li>
-                <li><b>3-3, 9-3</b>: Right面 90度反時計回転</li>
-                <li><b>7-8, 8-9, 9-6, 6-3, 3-2, 2-1, 1-4, 4-7</b>: Front面 90度時計回転</li>
-                <li><b>9-8, 8-7, 7-4, 4-1, 1-2, 2-3, 3-6, 6-9</b>: Front面 90度反時計回転</li>
-                <li><b>7-9</b>: Top面 90度時計回転</li>
-                <li><b>9-7</b>: Top面 90度反時計回転</li>
-                <li><b>7-7, 1-7</b>: Left面 90度時計回転</li>
-                <li><b>1-1, 7-1</b>: Left面 90度反時計回転</li>
-                <li><b>1-3</b>: Bottom面 90度時計回転</li>
-                <li><b>3-1</b>: Bottom面 90度反時計回転</li>
-                <li><b>5-2, 8-5</b>: キューブ全体をX軸正方向へ90度回転</li>
-                <li><b>5-8, 2-5</b>: キューブ全体をX軸正方向へ-90度回転</li>
-                <li><b>5-4, 6-5</b>: キューブ全体をY軸正方向へ-90度回転</li>
-                <li><b>5-6, 4-5</b>: キューブ全体をY軸正方向へ90度回転</li>
-                <li><b>8-6, 6-2, 2-4, 4-8</b>: キューブ全体をZ軸正方向へ-90度回転</li>
-                <li><b>8-4, 4-2, 2-6, 6-8</b>: キューブ全体をZ軸正方向へ90度回転</li>
-                <li><b>8-8, 2-8</b>: 中央X列 (X=0) を時計回転</li>
-                <li><b>8-2, 2-2</b>: 中央X列 (X=0) を反時計回転</li>
-                <li><b>6-6, 4-6</b>: 中央Y列 (Y=0) を時計回転</li>
-                <li><b>4-4, 6-4</b>: 中央Y列 (Y=0) を反時計回転</li>
-                <li><b>5-7</b>: 中央Z列 (Z=0) を時計回転</li>
-                <li><b>5-1</b>: 中央Z列 (Z=0) を反時計回転</li>
-                <li><b>5-5</b>: カメラ視点をTop, Front, RightとTop, Front, Leftで切り替え (アニメーション)</li>
-                <li><b>0-1</b>: **キューブをシャッフル** (アニメーション付き)</li>
-                <li><b>0-0</b>: **アンドゥ** (直前の操作を取り消す)</li>
-                <li><b>0-2</b>: **キューブの状態をコンソールに出力**</li>
+                <h3>面の回転</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>面</th>
+                            <th colspan="2">操作とキー</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <strong>Right面</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度時計回り</td>
+                                        <td>
+                                            <strong>9-9, 3-9</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度反時計回り</td>
+                                        <td>
+                                            <strong>3-3, 9-3</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>Front面</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度時計回り</td>
+                                        <td>
+                                            <strong>7-8, 8-9, 9-6, 6-3, 3-2, 2-1, 1-4, 4-7</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度反時計回り</td>
+                                        <td>
+                                            <strong>9-8, 8-7, 7-4, 4-1, 1-2, 2-3, 3-6, 6-9</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>Top面</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度時計回り</td>
+                                        <td>
+                                            <strong>9-7</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度反時計回り</td>
+                                        <td>
+                                            <strong>7-9</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>Left面</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度時計回り</td>
+                                        <td>
+                                            <strong>1-1, 7-1</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度反時計回り</td>
+                                        <td>
+                                            <strong>7-7, 1-7</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>Bottom面</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度時計回り</td>
+                                        <td>
+                                            <strong>1-3</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度反時計回り</td>
+                                        <td>
+                                            <strong>3-1</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+
+                <h3>中央列の回転</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>列</th>
+                            <th colspan="2">方向とキー</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <strong>中央X列 (X=0)</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>時計回り</td>
+                                        <td>
+                                            <strong>8-8, 2-8</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>反時計回り</td>
+                                        <td>
+                                            <strong>8-2, 2-2</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>中央Y列 (Y=0)</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>時計回り</td>
+                                        <td>
+                                            <strong>6-6, 4-6</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>反時計回り</td>
+                                        <td>
+                                            <strong>4-4, 6-4</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>中央Z列 (Z=0)</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>時計回り</td>
+                                        <td>
+                                            <strong>5-7, 3-5, 1-5, 5-9</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>反時計回り</td>
+                                        <td>
+                                            <strong>7-5, 5,3, 5-1, 9-5</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+
+                <h3>キューブ全体の回転（視点変更）</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>軸</th>
+                            <th colspan="2">方向とキー</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>
+                                <strong>X軸</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度反時計回り</td>
+                                        <td>
+                                            <strong>5-2, 8-5</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度時計回り</td>
+                                        <td>
+                                            <strong>5-8, 2-5</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>Y軸</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度反時計回り</td>
+                                    <td>
+                                            <strong>5-6, 4-5</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度時計回り</td>
+                                        <td>
+                                            <strong>5-4, 6-5</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>Z軸</strong>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度反時計回り</td>
+                                        <td>
+                                            <strong>8-4, 4-2, 2-6, 6-8</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td class="two-column-table">
+                                <table>
+                                    <tr>
+                                        <td>90度時計回り</td>
+                                        <td>
+                                            <strong>8-6, 6-2, 2-4, 4-8</strong>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>その他の操作</h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>操作</th>
+                            <th>キー</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>カメラ視点をTop, Front, RightとTop, Front, Leftで切り替え (アニメーション)</td>
+                            <td>
+                                <strong>5-5</strong>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>キューブをシャッフル</strong> (アニメーション付き)
+                            </td>
+                            <td>
+                                <strong>0-1</strong>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <strong>アンドゥ</strong> (直前の操作を取り消す)
+                            </td>
+                            <td>
+                                <strong>0-0</strong>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
             </ul>
             <p>※連続してキーを入力してください。</p>
-            <p><b>タッチ操作（スワイプ/タップ）:</b></p>
-            <ul>
-                <li><b>スワイプ:</b> フロント面 (Z=1のレイヤー) 上のキューブレットをタッチ開始点、別のキューブレット上をスワイプ終了点として認識し、対応するテンキー操作 (例: 7-8) を実行します。</li>
-                <li><b>ダブルタップ:</b> フロント面 (Z=1のレイヤー) 上の同じキューブレットを素早く2回タップすると、対応するテンキーの連続操作 (例: 8-8) を実行します。</li>
-                <li>画面がキューブ全体を映している場合、タッチしたキューブレットがフロント面（Z=1レイヤー）のものでなければ、テンキー操作は行われません。</li>
-            </ul>
         </details>
     </div>
 
     <div id="controls">
         <button id="shuffleButton">シャッフル</button>
         <button id="undoButton">アンドゥ</button>
-        <button id="logStateButton" style="display: none;">状態出力</button> <button id="cameraViewButton">視点切り替え</button>
+        <button id="logStateButton" style="display: none;">状態出力</button>
+        <button id="cameraViewButton">視点切り替え</button>
     </div>
 
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
@@ -167,7 +493,7 @@
             [colors.orange]: 'O', // Orange
             [colors.blue]: 'B', // Blue
             [colors.green]: 'G', // Green
-            [colors.gray]: ' '  // Gray (内側は空白で表示)
+            [colors.gray]: ' ' // Gray (内側は空白で表示)
         };
 
         const cubelets = []; // 全てのキューブレットを格納する配列
@@ -183,11 +509,11 @@
                     // 各面の初期色を設定（X, Y, Z座標に基づいて色を決定）
                     const materials = [
                         new THREE.MeshLambertMaterial({ color: (x === 1) ? colors.orange : colors.gray }), // Right (+X)
-                        new THREE.MeshLambertMaterial({ color: (x === -1) ? colors.red : colors.gray }),    // Left (-X)
-                        new THREE.MeshLambertMaterial({ color: (y === 1) ? colors.white : colors.gray }),    // Top (+Y)
-                        new THREE.MeshLambertMaterial({ color: (y === -1) ? colors.yellow : colors.gray }),  // Bottom (-Y)
-                        new THREE.MeshLambertMaterial({ color: (z === 1) ? colors.blue : colors.gray }),     // Front (+Z)
-                        new THREE.MeshLambertMaterial({ color: (z === -1) ? colors.green : colors.gray })    // Back (-Z)
+                        new THREE.MeshLambertMaterial({ color: (x === -1) ? colors.red : colors.gray }), // Left (-X)
+                        new THREE.MeshLambertMaterial({ color: (y === 1) ? colors.white : colors.gray }), // Top (+Y)
+                        new THREE.MeshLambertMaterial({ color: (y === -1) ? colors.yellow : colors.gray }), // Bottom (-Y)
+                        new THREE.MeshLambertMaterial({ color: (z === 1) ? colors.blue : colors.gray }), // Front (+Z)
+                        new THREE.MeshLambertMaterial({ color: (z === -1) ? colors.green : colors.gray }) // Back (-Z)
                     ];
                     const cubelet = new THREE.Mesh(geometry, materials);
                     // キューブレットの位置を設定（中央のキューブを原点とする）
@@ -308,12 +634,12 @@
             if (isRotating || isCameraAnimating || isShuffling || isUndoing) return;
             touchStartX = event.touches[0].clientX;
             touchStartY = event.touches[0].clientY;
-            
+
             const touchedCubelet = getIntersectedCubelet(touchStartX, touchStartY);
             startNumpad = touchedCubelet ? getLogicalNumpadPosition(touchedCubelet) : null;
-            
+
             console.log(`touchstart: startNumpad=${startNumpad}`); // デバッグログ追加
-            
+
             event.preventDefault(); // スクロールを防ぐ
         });
 
@@ -363,7 +689,7 @@
             } else {
                 // タップ（動きが少ない）が検出された場合
                 const currentTime = Date.now();
-                
+
                 if (currentTime - lastTapTime < DOUBLE_TAP_TIMEOUT && lastTapNumpad === endNumpad) {
                     // 同じエリアでのダブルタップが検出された
                     const operation = `${endNumpad}-${endNumpad}`;
@@ -431,11 +757,11 @@
             switch (operation) {
                 // --- 面の回転 (Right, Front, Top, Left, Bottom) ---
                 case '9-9': // Right面 90度時計回転
-                case '3-9': // (追加) 9-9と同じ操作
+                case '3-9':
                     axis.set(1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(1, null, null);
                     break;
                 case '3-3': // Right面 90度反時計回転
-                case '9-3': // (追加) 3-3と同じ操作
+                case '9-3':
                     axis.set(1, 0, 0); angle = Math.PI / 2; selectCubeletsByPosition(1, null, null);
                     break;
                 case '7-8': // Front面 時計方向に90度回転
@@ -527,9 +853,15 @@
                     axis.set(0, 1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, 0, null);
                     break;
                 case '5-7': // Z=0面を時計回転 (Front面基準)
+                case '3-5':
+                case '1-5':
+                case '5-9':
                     axis.set(0, 0, 1); angle = -Math.PI / 2; selectCubeletsByPosition(null, null, 0);
                     break;
-                case '5-1': // Z=0面を反時計回転 (Front面基準)
+                case '7-5': // Z=0面を時計回転 (Front面基準)
+                case '5-3':
+                case '5-1':
+                case '9-5':
                     axis.set(0, 0, 1); angle = Math.PI / 2; selectCubeletsByPosition(null, null, 0);
                     break;
 
@@ -540,7 +872,7 @@
             }
 
             // 履歴への追加は、アンドゥ操作でない場合に行う
-            if (source !== 'undo') { 
+            if (source !== 'undo') {
                 moveHistory.push(operation);
                 console.log("履歴に追加:", operation);
             }
@@ -627,7 +959,7 @@
             }
 
             rotatingGroup.clear(); // 回転グループから全ての子を削除 (グループは空になる)
-            
+
             // cubelets配列を更新し、シーン内の現在のBoxGeometryメッシュを参照するようにする
             cubelets.length = 0; // 配列をクリア
             scene.traverse(object => {
@@ -653,7 +985,7 @@
 
             // アンドゥ中であれば次の操作を実行
             if (isUndoing && shuffleQueue.length > 0) { // シャッフルと同じキューを利用
-                 setTimeout(() => {
+                setTimeout(() => {
                     performRotation(shuffleQueue.shift(), 'undo'); // アンドゥの逆操作を実行
                 }, 100); // 100msの遅延
             } else if (isUndoing && shuffleQueue.length === 0) {
@@ -693,7 +1025,7 @@
                 const randomIndex = Math.floor(Math.random() * ALL_FACES.length);
                 shuffleQueue.push(ALL_FACES[randomIndex]);
             }
-            
+
             // 最初のシャッフル操作を開始
             performRotation(shuffleQueue.shift(), 'shuffle');
             updateButtonStates(); // シャッフル開始時にも更新
@@ -791,7 +1123,7 @@
                 default: return null;
             }
         }
-        
+
         // --- アニメーションループ ---
         function animate() {
             requestAnimationFrame(animate); // 次のフレームで再度この関数を呼び出す
@@ -815,7 +1147,7 @@
                 if (!isRotating) {
                     // isShuffling と isUndoing の状態に基づいて source を決定
                     const source = isShuffling ? 'shuffle' : (isUndoing ? 'undo' : 'user');
-                    updateCubeletPositions(source); 
+                    updateCubeletPositions(source);
                 }
             }
 
@@ -896,19 +1228,19 @@
                 'Top': Array(9).fill(' '),    // White (Y+面)
                 'Bottom': Array(9).fill(' '), // Yellow (Y-面)
                 'Front': Array(9).fill(' '),  // Blue (Z+面)
-                'Back':    Array(9).fill(' '),    // Green (Z-面)
-                'Left':    Array(9).fill(' '),    // Red (X-面)
-                'Right':   Array(9).fill(' ')    // Orange (X+面)
+                'Back': Array(9).fill(' '),    // Green (Z-面)
+                'Left': Array(9).fill(' '),    // Red (X-面)
+                'Right': Array(9).fill(' ')    // Orange (X+面)
             };
 
             // ワールド座標系における各面の基準方向ベクトル
             const worldAxes = {
-                'Top':    new THREE.Vector3(0, 1, 0),
+                'Top': new THREE.Vector3(0, 1, 0),
                 'Bottom': new THREE.Vector3(0, -1, 0),
-                'Front':  new THREE.Vector3(0, 0, 1),
-                'Back':    new THREE.Vector3(0, 0, -1),
-                'Left':    new THREE.Vector3(-1, 0, 0),
-                'Right':   new THREE.Vector3(1, 0, 0)
+                'Front': new THREE.Vector3(0, 0, 1),
+                'Back': new THREE.Vector3(0, 0, -1),
+                'Left': new THREE.Vector3(-1, 0, 0),
+                'Right': new THREE.Vector3(1, 0, 0)
             };
 
             const tolerance = 0.01; // 位置やベクトルの比較における許容誤差
