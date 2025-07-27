@@ -486,6 +486,9 @@
             let angle = 0;
             let selectAll = false;
 
+            // --- 追加箇所: rotatingGroupのクォータニオンを明示的にリセット ---
+            rotatingGroup.quaternion.identity(); // 毎回リセットしてクリーンな状態から始める
+
             switch (operation) {
                 // --- 面の回転 (Right, Front, Top, Left, Bottom) ---
                 case '9-9': case '3-9': axis.set(1, 0, 0); angle = -Math.PI / 2; selectCubeletsByPosition(1, null, null); break;
