@@ -456,8 +456,8 @@
     <script>
         // --- シーンの初期設定 ---
         const scene = new THREE.Scene();
-        // 透視投影カメラを使用 (FOVを30に縮小)
-        const camera = new THREE.PerspectiveCamera(30, window.innerWidth / window.innerHeight, 1, 1000);
+        // 透視投影カメラを使用 (FOVを35に縮小)
+        const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true }); // アンチエイリアスを有効に
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
