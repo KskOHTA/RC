@@ -503,59 +503,41 @@
             scene.add(rotatingGroup); // rotatingGroupをシーンに追加
         }
 
-        /**
-         * @attention ここから修正箇所
-         */
         function updateCubeletPositions(source = 'user') {
-            // pivotのワールド行列を取得し、その逆行列を計算
-            const pivotWorldMatrix = pivot.matrixWorld.clone();
-            const inversePivotWorldMatrix = pivotWorldMatrix.invert();
-
             for (let i = rotatingGroup.children.length - 1; i >= 0; i--) {
                 const cubelet = rotatingGroup.children[i];
 
-                // キューブレットのワールド座標とワールド回転を取得
+                rotatingGroup.updateMatrixWorld(true);
+                cubelet.updateMatrixWorld(true);
+
                 const worldPosition = new THREE.Vector3();
                 cubelet.getWorldPosition(worldPosition);
                 const worldQuaternion = new THREE.Quaternion();
                 cubelet.getWorldQuaternion(worldQuaternion);
 
-                // ワールド座標をpivotのローカル座標に変換
-                worldPosition.applyMatrix4(inversePivotWorldMatrix);
-                // ワールド回転をpivotのローカル回転に変換
-                // pivotの回転を考慮して、キューブレットのローカル回転を求める
-                // worldQ = pivotQ * cubeletQ_local
-                // cubeletQ_local = pivotQ_inverse * worldQ
-                const pivotQuaternionInverse = pivot.quaternion.clone().invert();
-                worldQuaternion.premultiply(pivotQuaternionInverse);
+                cubelet.position.copy(worldPosition);
+                cubelet.quaternion.copy(worldQuaternion);
+                cubelet.matrix.identity();
+                cubelet.matrix.compose(cubelet.position, cubelet.quaternion, cubelet.scale);
 
-
-                // 位置をグリッドにスナップ
+                // 精度誤差対策
                 const gridUnit = (cubeSize + gap);
-                cubelet.position.x = Math.round(worldPosition.x / gridUnit) * gridUnit;
-                cubelet.position.y = Math.round(worldPosition.y / gridUnit) * gridUnit;
-                cubelet.position.z = Math.round(worldPosition.z / gridUnit) * gridUnit;
+                cubelet.position.x = Math.round(cubelet.position.x / gridUnit) * gridUnit;
+                cubelet.position.y = Math.round(cubelet.position.y / gridUnit) * gridUnit;
+                cubelet.position.z = Math.round(cubelet.position.z / gridUnit) * gridUnit;
 
-                // 回転を90度の倍数にスナップ
-                const snapAngle = Math.PI / 2;
-                const euler = new THREE.Euler().setFromQuaternion(worldQuaternion, 'XYZ');
-                euler.x = Math.round(euler.x / snapAngle) * snapAngle;
-                euler.y = Math.round(euler.y / snapAngle) * snapAngle;
-                euler.z = Math.round(euler.z / snapAngle) * snapAngle;
+                const euler = new THREE.Euler().setFromQuaternion(cubelet.quaternion, 'XYZ');
+                euler.x = Math.round(euler.x / (Math.PI / 2)) * (Math.PI / 2);
+                euler.y = Math.round(euler.y / (Math.PI / 2)) * (Math.PI / 2);
+                euler.z = Math.round(euler.z / (Math.PI / 2)) * (Math.PI / 2);
                 cubelet.quaternion.setFromEuler(euler);
 
-                // rotatingGroupから削除し、pivotの子に戻す
-                rotatingGroup.remove(cubelet);
-                pivot.add(cubelet);
+                pivot.add(cubelet); // pivotの子に戻す
             }
-            rotatingGroup.clear(); // rotatingGroupを空にする
+            rotatingGroup.clear(); // 回転グループから全ての子を削除
             scene.remove(rotatingGroup); // rotatingGroupをシーンから削除
 
             isRotating = false;
-
-            /**
-             * @attention 修正箇所ここまで
-             */
 
             if (isShuffling && shuffleQueue.length > 0) {
                 setTimeout(() => { performRotation(shuffleQueue.shift(), 'shuffle'); }, 100);
