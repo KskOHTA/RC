@@ -27,7 +27,7 @@
             padding: 15px;
             border-radius: 8px;
             z-index: 100;
-            font-size: 0.45em; /* 説明文のフォントサイズを小さくする */
+            font-size: 0.5em; /* 説明文のフォントサイズを小さくする */
         }
 
         #info h1 {
@@ -301,7 +301,7 @@
                                     <tr>
                                         <td>時計回り</td>
                                         <td>
-                                            <strong>5-7, 3-5, 1-5, 5-9</strong>
+                                            <strong>3-7, 1-9</strong>
                                         </td>
                                     </tr>
                                 </table>
@@ -311,7 +311,7 @@
                                     <tr>
                                         <td>反時計回り</td>
                                         <td>
-                                            <strong>7-5, 5,3, 5-1, 9-5</strong>
+                                            <strong>7-3, 9-1</strong>
                                         </td>
                                     </tr>
                                 </table>
@@ -853,16 +853,12 @@
                 case '6-4':
                     axis.set(0, 1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, 0, null);
                     break;
-                case '5-7': // Z=0面を時計回転 (Front面基準)
-                case '3-5':
-                case '1-5':
-                case '5-9':
+                case '1-9': // Z=0面を時計回転 (Front面基準) - 変更
+                case '3-7': // Z=0面を時計回転 (Front面基準) - 変更
                     axis.set(0, 0, 1); angle = -Math.PI / 2; selectCubeletsByPosition(null, null, 0);
                     break;
-                case '7-5': // Z=0面を時計回転 (Front面基準)
-                case '5-3':
-                case '5-1':
-                case '9-5':
+                case '9-1': // Z=0面を反時計回転 (Front面基準) - 変更
+                case '7-3': // Z=0面を反時計回転 (Front面基準) - 変更
                     axis.set(0, 0, 1); angle = Math.PI / 2; selectCubeletsByPosition(null, null, 0);
                     break;
 
@@ -1009,7 +1005,7 @@
             '8-6', '8-4', // Cube Z
             '8-8', '8-2', // Middle X
             '6-6', '4-4', // Middle Y
-            '5-7', '5-1'  // Middle Z
+            '1-9', '9-1'  // Middle Z (Updated)
         ];
 
         async function shuffleCube() {
@@ -1119,14 +1115,10 @@
                 case '4-6': return '4-4'; // 6-6, 4-6 の逆は 4-4, 6-4
                 case '4-4':
                 case '6-4': return '6-6'; // 4-4, 6-4 の逆は 6-6, 4-6
-                case '5-7':
-                case '3-5':
-                case '1-5':
-                case '5-9': return '5-1';
-                case '7-5':
-                case '5-3':
-                case '5-1':
-                case '9-5': return '5-7';
+                case '1-9':
+                case '3-7': return '9-1'; // Updated Z-axis middle layer operations
+                case '9-1':
+                case '7-3': return '1-9'; // Updated Z-axis middle layer operations
                 default: return null;
             }
         }
