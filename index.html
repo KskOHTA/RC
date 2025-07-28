@@ -54,6 +54,7 @@
             border-radius: 8px;
             z-index: 10;
             display: flex;
+            touch-action: manipulation; /* Add this line */
             gap: 10px; /* ボタン間の隙間 */
         }
 
@@ -66,7 +67,6 @@
             border-radius: 5px;
             cursor: pointer;
             transition: background-color 0.2s;
-            touch-action: manipulation; /* Add this line */
         }
 
         #controls button:hover {
