@@ -302,7 +302,7 @@
                                     <tr>
                                         <td>時計回り</td>
                                         <td>
-                                            <strong>3-7, 1-9</strong>
+                                            <strong>7-3, 1-9</strong>
                                         </td>
                                     </tr>
                                 </table>
@@ -312,7 +312,7 @@
                                     <tr>
                                         <td>反時計回り</td>
                                         <td>
-                                            <strong>7-3, 9-1</strong>
+                                            <strong>3-7, 9-1</strong>
                                         </td>
                                     </tr>
                                 </table>
@@ -855,11 +855,11 @@
                     axis.set(0, 1, 0); angle = -Math.PI / 2; selectCubeletsByPosition(null, 0, null);
                     break;
                 case '1-9': // Z=0面を時計回転 (Front面基準) - 変更
-                case '3-7': // Z=0面を時計回転 (Front面基準) - 変更
+                case '7-3': // Z=0面を時計回転 (Front面基準) - 変更
                     axis.set(0, 0, 1); angle = -Math.PI / 2; selectCubeletsByPosition(null, null, 0);
                     break;
                 case '9-1': // Z=0面を反時計回転 (Front面基準) - 変更
-                case '7-3': // Z=0面を反時計回転 (Front面基準) - 変更
+                case '3-7': // Z=0面を反時計回転 (Front面基準) - 変更
                     axis.set(0, 0, 1); angle = Math.PI / 2; selectCubeletsByPosition(null, null, 0);
                     break;
 
