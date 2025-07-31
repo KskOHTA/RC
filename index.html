@@ -279,7 +279,7 @@
                                         </td>
                                     </tr>
                                 </table>
-                            </td>
+            </td>
                             <td class="two-column-table">
                                 <table>
                                     <tr>
@@ -398,7 +398,7 @@
                                     <tr>
                                         <td>90度時計回り</td>
                                         <td>
-                                            <strong>8-6, 6-2, 2-4, 4-8</strong>
+                                            <strong>8-6, 6-2, 2-4, 6-8</strong>
                                         </td>
                                     </tr>
                                 </table>
@@ -516,6 +516,26 @@
         const borderThickness = 3; // 枠線の太さ
         const borderOffset = 0.5; // 枠線を面からわずかに浮かせZ-fightingを防ぐためのオフセット
 
+        // --- 透明度/枠線制御のための変数と関数 ---
+        // ★修正点: アニメーション関連の変数を、使用される関数よりも前に宣言
+        let currentDisplayMode = 'opaque'; // 'opaque': 不透明, 'transparent': 透過モード
+        let displayModeBeforeAnimation = 'opaque'; // アニメーション開始前の表示モードを保存する新しい変数
+        let rotatingGroup = new THREE.Group(); // 回転するキューブレットを一時的にまとめるグループ
+        let isRotating = false; // 現在回転中かどうか
+        let rotationAxis = new THREE.Vector3(); // 回転軸
+        let targetRotationAngle = 0; // 目標の回転角度
+        let currentRotationAngle = 0; // 現在のアニメーション回転角度
+        const rotationSpeed = Math.PI / 15; // 1フレームあたりの回転速度 (シャッフルやアンドゥのために少し速くする)
+        let targetCameraPosition = camera.position.clone(); // カメラの目標位置
+        let targetCameraQuaternion = camera.quaternion.clone(); // カメラの目標クォータニオン (向き)
+        let isCameraAnimating = false; // 現在カメラがアニメーション中かどうか
+        const cameraAnimationSpeed = 0.3; // カメラアニメーションの補間速度 (0.0: 遅い - 1.0: 速い)
+        let currentView = 'TFR'; // 現在のカメラビュー ('TFR': Top-Front-Right, 'TFL': Top-Front-Left)
+        const moveHistory = []; // 実行された操作の履歴
+        let shuffleQueue = []; // シャッフル中に実行する操作のキュー
+        let isShuffling = false; // シャッフル中かどうか
+        let isUndoing = false; // アンドゥ中かどうか
+
         // --- 個々のキューブレット (ミニキューブ) の作成 ---
         for (let x = -1; x <= 1; x++) {
             for (let y = -1; y <= 1; y++) {
@@ -564,19 +584,6 @@
             }
         }
 
-        // --- 透明度/枠線制御のための変数と関数 ---
-        let currentDisplayMode = 'opaque'; // 'opaque': 不透明, 'transparent': 透過モード
-        // アニメーション後に透過モードを復元するかどうか
-        let restoreTransparencyModeAfterAnimation = false;
-
-        // BoxGeometryの面の法線 (ローカル座標)
-        // 順序はTHREE.BoxGeometryの面の順序に厳密に従う:
-        // 0: Right (+X)
-        // 1: Left (-X)
-        // 2: Top (+Y)
-        // 3: Bottom (-Y)
-        // 4: Front (+Z)
-        // 5: Back (-Z)
         const localFaceNormals = [
             new THREE.Vector3(1, 0, 0),    // 0: Right (+X)
             new THREE.Vector3(-1, 0, 0),   // 1: Left (-X)
@@ -595,36 +602,23 @@
         const dotTolerance = 0.9; // ドット積の許容誤差 (ベクトルがほぼ平行であることを判定)
 
         // 指定されたキューブレットの面に対して額縁を作成し追加する関数
+// 指定されたキューブレットの面に対して額縁を作成し追加する関数
         function addFaceBorders(cubelet, materialIndex, originalFaceColor) {
-            const faceNormal = localFaceNormals[materialIndex].clone(); // その面のローカル法線
+//            console.log(`[addFaceBorders] cubelet: ${cubelet.uuid}, materialIndex: ${materialIndex}`);
             const borderMaterial = new THREE.MeshLambertMaterial({ color: originalFaceColor, side: THREE.DoubleSide });
 
             const halfCubeSize = cubeSize / 2;
             const borderHalfThickness = borderThickness / 2;
             const offsetFromFace = halfCubeSize + borderOffset; // Z-fightingを防ぐためのオフセット
 
-            const strips = [];
-
-            // 額縁の各辺を構成するジオメトリを定義
-            // これらは、面がXY平面（法線がZ軸方向）にあると仮定して定義されます。
+            // Geometry definitions for the strips
+            // These are defined as if the face lies on the XY plane with its normal pointing along Z+
             const longStripGeom = new THREE.BoxGeometry(cubeSize, borderThickness, borderThickness);
             const shortStripGeom = new THREE.BoxGeometry(borderThickness, cubeSize - 2 * borderThickness, borderThickness);
 
-            // 4つの額縁メッシュを作成
-            const stripTop = new THREE.Mesh(longStripGeom, borderMaterial);
-            const stripBottom = new THREE.Mesh(longStripGeom, borderMaterial);
-            const stripLeft = new THREE.Mesh(shortStripGeom, borderMaterial);
-            const stripRight = new THREE.Mesh(shortStripGeom, borderMaterial);
-
-            // 面がZ+方向（前面）にあると仮定して、各ストリップの位置を設定
-            stripTop.position.set(0, halfCubeSize - borderHalfThickness, 0);
-            stripBottom.position.set(0, -(halfCubeSize - borderHalfThickness), 0);
-            stripLeft.position.set(-(halfCubeSize - borderHalfThickness), 0, 0);
-            stripRight.position.set(halfCubeSize - borderHalfThickness, 0, 0);
-
-            // 面の向きに合わせてストリップを回転させるためのクォータニオンを計算
+            // Calculate the quaternion to orient the strips based on the face's actual orientation
             const faceQuaternion = new THREE.Quaternion();
-            const tempObject = new THREE.Object3D(); // ヘルパーオブジェクト
+            const tempObject = new THREE.Object3D(); // Helper object for rotation calculation
 
             switch (materialIndex) {
                 case 0: // Right (+X)
@@ -639,8 +633,7 @@
                 case 3: // Bottom (-Y)
                     tempObject.rotation.x = Math.PI / 2;
                     break;
-                case 4: // Front (+Z)
-                    // Z+面は回転不要
+                case 4: // Front (+Z) - No rotation needed from base orientation
                     break;
                 case 5: // Back (-Z)
                     tempObject.rotation.y = Math.PI;
@@ -648,16 +641,32 @@
             }
             faceQuaternion.copy(tempObject.quaternion);
 
-            [stripTop, stripBottom, stripLeft, stripRight].forEach(strip => {
-                // ストリップの位置と回転にクォータニオンを適用
+            // Define the local positions of the strips *as if the face were aligned with the XY plane and its normal was Z+*.
+            // These positions are relative to the cubelet's center for a Z+ face.
+            const stripConfigs = [
+                // Top strip
+                { geom: longStripGeom, localPos: new THREE.Vector3(0, halfCubeSize - borderHalfThickness, offsetFromFace) },
+                // Bottom strip
+                { geom: longStripGeom, localPos: new THREE.Vector3(0, -(halfCubeSize - borderHalfThickness), offsetFromFace) },
+                // Left strip
+                { geom: shortStripGeom, localPos: new THREE.Vector3(-(halfCubeSize - borderHalfThickness), 0, offsetFromFace) },
+                // Right strip
+                { geom: shortStripGeom, localPos: new THREE.Vector3(halfCubeSize - borderHalfThickness, 0, offsetFromFace) }
+            ];
+
+            stripConfigs.forEach(config => {
+                const strip = new THREE.Mesh(config.geom, borderMaterial);
+
+                // 1. ストリップのローカル位置を先に設定
+                strip.position.copy(config.localPos);
+                // 2. そのローカル位置に、面の向きのクォータニオンを適用して回転させる
                 strip.position.applyQuaternion(faceQuaternion);
+
+                // 3. ストリップ自体の向きに、面の向きのクォータニオンを適用する
                 strip.quaternion.copy(faceQuaternion);
 
-                // 最終的なオフセットを面の法線方向に適用
-                strip.position.add(faceNormal.clone().multiplyScalar(offsetFromFace));
-
-                strip.userData.isBorderRect = true; // 枠線であることを示すフラグ
-                strip.userData.materialIndex = materialIndex; // 元の面の materialIndex を保存
+                strip.userData.isBorderRect = true;
+                strip.userData.materialIndex = materialIndex;
                 strip.renderOrder = 1; // 枠線をキューブレットの手前に描画
                 cubelet.add(strip);
             });
@@ -665,6 +674,7 @@
 
         // 指定されたキューブレットから枠線を削除する関数
         function removeFaceBorders(cubelet) {
+//            console.log(`[removeFaceBorders] cubelet: ${cubelet.uuid}`);
             // 一時的に子要素の配列をコピーして、ループ中に要素を削除できるようにする
             const childrenToRemove = cubelet.children.filter(child => child.userData.isBorderRect);
 
@@ -676,24 +686,29 @@
                     if (Array.isArray(child.material)) {
                         child.material.forEach(mat => mat.dispose());
                     } else {
-                        child.material.dispose();
+                        child.material.dispose(); // ★修正点: 単一マテリアルの場合もdisposeを呼ぶ
                     }
                 }
             });
         }
 
         function toggleFaceDisplayMode() {
+//            console.log(`[toggleFaceDisplayMode] 開始: currentDisplayMode=${currentDisplayMode}, displayModeBeforeAnimation=${displayModeBeforeAnimation}`);
             // アニメーション中は透過モードの切り替えを無効化
             if (isRotating || isCameraAnimating || isShuffling || isUndoing) {
-                console.log("アニメーション中は透過モードの切り替えはできません。");
+                console.log("[toggleFaceDisplayMode] アニメーション中は透過モードの切り替えはできません。");
                 return;
             }
 
             currentDisplayMode = (currentDisplayMode === 'opaque') ? 'transparent' : 'opaque';
+            // ★修正点: 直接透過モードを切り替える場合は、displayModeBeforeAnimationも更新
+            displayModeBeforeAnimation = currentDisplayMode; // ここで現在の表示モードを永続化
             applyFaceDisplayMode();
+//            console.log(`[toggleFaceDisplayMode] 完了: currentDisplayMode=${currentDisplayMode}, displayModeBeforeAnimation=${displayModeBeforeAnimation}`);
         }
 
         function applyFaceDisplayMode() {
+//            console.log(`[applyFaceDisplayMode] 開始: currentDisplayMode=${currentDisplayMode}, displayModeBeforeAnimation=${displayModeBeforeAnimation}, isRotating=${isRotating}, isCameraAnimating=${isCameraAnimating}, isShuffling=${isShuffling}, isUndoing=${isUndoing}`);
             cubelets.forEach(cubelet => {
                 // まず、既存の枠線を全て削除
                 removeFaceBorders(cubelet);
@@ -711,11 +726,13 @@
                     const isInnerFaceOriginal = (mat.originalColorHex === colors.black); // オリジナルカラーで内側の面か判定
 
                     if (currentDisplayMode === 'transparent') { // 透過モード
+//                        console.log(`[applyFaceDisplayMode] Cubelet ${cubelet.uuid}, Material ${materialIndex}: Applying transparent mode logic.`);
                         if (isInnerFaceOriginal) {
                             // 内側の面は常に非表示
                             mat.transparent = true;
                             mat.opacity = 0.0;
                             mat.depthWrite = false; // 透明なオブジェクトは深度バッファに書き込まない
+//                            console.log(`[applyFaceDisplayMode]   Inner face: Hidden.`);
                         } else {
                             // 外側の面の場合
                             const worldNormal = localFaceNormals[materialIndex].clone().applyQuaternion(cubelet.quaternion);
@@ -731,25 +748,47 @@
 
                             const normalizedWorldNormal = worldNormal.clone().normalize(); // 正規化してドット積を正確にする
 
+                            // デバッグログ追加: 面の向きと判定値
+//                            console.log(`[applyFaceDisplayMode]   Cubelet (${gridX},${gridY},${gridZ}) - Face ${materialIndex} (Local Normal: ${localFaceNormals[materialIndex].x},${localFaceNormals[materialIndex].y},${localFaceNormals[materialIndex].z}), World Normal: (${normalizedWorldNormal.x.toFixed(2)}, ${normalizedWorldNormal.y.toFixed(2)}, ${normalizedWorldNormal.z.toFixed(2)})`);
+
                             if (currentView === 'TFR') {
                                 // TFRモード: Top (+Y), Front (+Z), Right (+X) のいずれかの外側の面
-                                if (Math.abs(gridY) === 1 && Math.abs(normalizedWorldNormal.dot(worldTopAxis)) > dotTolerance && gridY === 1) { // Top面 (+Y)
+                                const dotTop = normalizedWorldNormal.dot(worldTopAxis);
+                                const dotFront = normalizedWorldNormal.dot(worldFrontAxis);
+                                const dotRight = normalizedWorldNormal.dot(worldRightAxis);
+
+//                                console.log(`[applyFaceDisplayMode]     TFR Mode: Dot Top=${dotTop.toFixed(2)}, Dot Front=${dotFront.toFixed(2)}, Dot Right=${dotRight.toFixed(2)}`);
+
+                                if (Math.abs(gridY) === 1 && dotTop > dotTolerance && gridY === 1) { // Top面 (+Y)
                                     isFramedFace = true;
-                                } else if (Math.abs(gridZ) === 1 && Math.abs(normalizedWorldNormal.dot(worldFrontAxis)) > dotTolerance && gridZ === 1) { // Front面 (+Z)
+//                                    console.log(`[applyFaceDisplayMode]       Matched Top Face (Y=1)`);
+                                } else if (Math.abs(gridZ) === 1 && dotFront > dotTolerance && gridZ === 1) { // Front面 (+Z)
                                     isFramedFace = true;
-                                } else if (Math.abs(gridX) === 1 && Math.abs(normalizedWorldNormal.dot(worldRightAxis)) > dotTolerance && gridX === 1) { // Right面 (+X)
+//                                    console.log(`[applyFaceDisplayMode]       Matched Front Face (Z=1)`);
+                                } else if (Math.abs(gridX) === 1 && dotRight > dotTolerance && gridX === 1) { // Right面 (+X)
                                     isFramedFace = true;
+//                                    console.log(`[applyFaceDisplayMode]       Matched Right Face (X=1)`);
                                 }
                             } else { // currentView === 'TFL'
                                 // TFLモード: Top (+Y), Front (+Z), Left (-X) のいずれかの外側の面
-                                if (Math.abs(gridY) === 1 && Math.abs(normalizedWorldNormal.dot(worldTopAxis)) > dotTolerance && gridY === 1) { // Top面 (+Y)
+                                const dotTop = normalizedWorldNormal.dot(worldTopAxis);
+                                const dotFront = normalizedWorldNormal.dot(worldFrontAxis);
+                                const dotLeft = normalizedWorldNormal.dot(worldLeftAxis); // Left軸とのドット積
+
+//                                console.log(`[applyFaceDisplayMode]     TFL Mode: Dot Top=${dotTop.toFixed(2)}, Dot Front=${dotFront.toFixed(2)}, Dot Left=${dotLeft.toFixed(2)}`);
+
+                                if (Math.abs(gridY) === 1 && dotTop > dotTolerance && gridY === 1) { // Top面 (+Y)
                                     isFramedFace = true;
-                                } else if (Math.abs(gridZ) === 1 && Math.abs(normalizedWorldNormal.dot(worldFrontAxis)) > dotTolerance && gridZ === 1) { // Front面 (+Z)
+//                                    console.log(`[applyFaceDisplayMode]       Matched Top Face (Y=1)`);
+                                } else if (Math.abs(gridZ) === 1 && dotFront > dotTolerance && gridZ === 1) { // Front面 (+Z)
                                     isFramedFace = true;
-                                } else if (Math.abs(gridX) === 1 && Math.abs(normalizedWorldNormal.dot(worldLeftAxis)) > dotTolerance && gridX === -1) { // Left面 (-X)
+//                                    console.log(`[applyFaceDisplayMode]       Matched Front Face (Z=1)`);
+                                } else if (Math.abs(gridX) === 1 && dotLeft > dotTolerance && gridX === -1) { // Left面 (-X)
                                     isFramedFace = true;
+//                                    console.log(`[applyFaceDisplayMode]       Matched Left Face (X=-1)`);
                                 }
                             }
+//                            console.log(`[applyFaceDisplayMode]   Outer face at (${gridX},${gridY},${gridZ}), isFramedFace=${isFramedFace}`);
 
 
                             if (isFramedFace) {
@@ -758,21 +797,26 @@
                                 mat.opacity = 0.0;
                                 mat.depthWrite = false; // 描画しないので深度書き込みも不要
                                 addFaceBorders(cubelet, materialIndex, mat.originalColorHex); // 額縁を追加
+//                                console.log(`[applyFaceDisplayMode]     Framed: transparent, borders added.`);
                             } else {
                                 // それ以外の外側の面 (Bottom, Left/Right, Backなど) は不透明にする
                                 mat.transparent = false; // ここをfalseに
                                 mat.opacity = 1.0; // ここを1.0に
                                 mat.depthWrite = true; // ここをtrueに
+//                                console.log(`[applyFaceDisplayMode]     Not framed: opaque.`);
                             }
                         }
                     } else { // 不透明モード ('opaque')
+//                        console.log(`[applyFaceDisplayMode] Cubelet ${cubelet.uuid}, Material ${materialIndex}: Applying opaque mode logic.`);
                         mat.transparent = false;
                         mat.opacity = 1.0;
                         mat.depthWrite = true;
+//                        console.log(`[applyFaceDisplayMode]   Opaque.`);
                     }
                     mat.needsUpdate = true;
                 });
             });
+//            console.log(`[applyFaceDisplayMode] 完了: currentDisplayMode=${currentDisplayMode}`);
         }
 
         // 初期状態でディスプレイモードを適用 (デフォルトは不透明)
@@ -785,6 +829,7 @@
         const KEY_TIMEOUT = 500; // 2ストローク入力のタイムアウト時間 (ms)
 
         window.addEventListener('keydown', (event) => {
+//            console.log(`[keydown] Event: ${event.key}, firstKey: ${firstKey}, time: ${Date.now()}`);
             const currentTime = Date.now();
             const key = event.key;
 
@@ -793,10 +838,11 @@
                 if (firstKey === null || (currentTime - lastKeyPressTime > KEY_TIMEOUT)) {
                     // 1回目の入力、またはタイムアウト後の新たな入力として記録
                     firstKey = key;
+//                    console.log(`[keydown] First key set: ${firstKey}`);
                 } else {
                     // 2回目の入力。2ストローク操作を実行
                     const operation = firstKey + '-' + key;
-                    console.log("Operation (Key):", operation);
+//                    console.log("[keydown] Operation (Key):", operation);
 
                     if (operation === '0-2') { // キューブ状態出力
                         logCubeState();
@@ -810,6 +856,15 @@
                         toggleFaceDisplayMode();
                     }
                     else {
+//                        console.log(`[keydown] Performing rotation: ${operation}. Initial modes: current=${currentDisplayMode}, before=${displayModeBeforeAnimation}`);
+                        // ★修正点: 単一のユーザー回転の場合、アニメーション開始前に現在の表示モードを保存
+                        displayModeBeforeAnimation = currentDisplayMode;
+                        // アニメーションのために一時的に不透明にする（元々透過モードの場合）
+                        if (currentDisplayMode === 'transparent') {
+//                            console.log("[keydown] Switching to opaque for animation.");
+                            currentDisplayMode = 'opaque';
+                            applyFaceDisplayMode();
+                        }
                         // ルービックキューブの回転操作を実行
                         performRotation(operation);
                     }
@@ -819,6 +874,7 @@
             } else {
                 // テンキー以外のキーが押されたら、2ストローク入力状態をリセット
                 firstKey = null;
+//                console.log("[keydown] Non-numpad key, firstKey reset.");
             }
         });
 
@@ -888,6 +944,7 @@
 
 
         renderer.domElement.addEventListener('touchstart', (event) => {
+            console.log(`[touchstart] Event. Current animation states: isRotating=${isRotating}, isCameraAnimating=${isCameraAnimating}, isShuffling=${isShuffling}, isUndoing=${isUndoing}`);
             if (isRotating || isCameraAnimating || isShuffling || isUndoing) return;
             touchStartX = event.touches[0].clientX;
             touchStartY = event.touches[0].clientY;
@@ -895,16 +952,18 @@
             const touchedCubelet = getIntersectedCubelet(touchStartX, touchStartY);
             startNumpad = touchedCubelet ? getLogicalNumpadPosition(touchedCubelet) : null;
 
-            console.log(`touchstart: startNumpad=${startNumpad}`); // デバッグログ追加
+            console.log(`[touchstart] startNumpad=${startNumpad}`); // デバッグログ追加
 
             event.preventDefault(); // スクロールを防ぐ
         }, { passive: true }); // passive: true を追加
 
         renderer.domElement.addEventListener('touchend', (event) => {
+            console.log(`[touchend] Event. Current animation states: isRotating=${isRotating}, isCameraAnimating=${isCameraAnimating}, isShuffling=${isShuffling}, isUndoing=${isUndoing}`);
             if (isRotating || isCameraAnimating || isShuffling || isUndoing) {
                 // アニメーション中はタップもスワイプも受け付けない
                 lastTapTime = 0; // タップ状態もリセット
                 lastTapNumpad = null;
+                console.log("[touchend] Animation in progress, ignoring touch.");
                 return;
             }
 
@@ -918,12 +977,13 @@
             const currentTouchedCubelet = getIntersectedCubelet(touchEndX, touchEndY);
             const endNumpad = currentTouchedCubelet ? getLogicalNumpadPosition(currentTouchedCubelet) : null;
 
-            console.log(`touchend: endNumpad=${endNumpad}, isSwipe=${isSwipe}`); // デバッグログ追加
+            console.log(`[touchend] endNumpad=${endNumpad}, isSwipe=${isSwipe}. Initial modes: current=${currentDisplayMode}, before=${displayModeBeforeAnimation}`); // デバッグログ追加
 
             if (endNumpad === null) {
                 // フロント面のキューブレットに触れていない場合、タップ状態をリセットして終了
                 lastTapTime = 0;
                 lastTapNumpad = null;
+                console.log("[touchend] No cubelet touched or not front face. Resetting tap state.");
                 return;
             }
 
@@ -931,14 +991,25 @@
                 // スワイプが検出された場合
                 if (startNumpad !== null && startNumpad !== endNumpad) {
                     const operation = `${startNumpad}-${endNumpad}`;
-                    console.log("Operation (Swipe):", operation);
+                    console.log("[touchend] Operation (Swipe):", operation);
                     // テンキー操作を実行
                     if (operation === '0-2') { logCubeState(); }
                     else if (operation === '0-1') { shuffleCube(); }
                     else if (operation === '0-0') { undoLastMove(); }
                     else if (operation === '5-5') { changeCameraView(); }
                     else if (operation === '0-3') { toggleFaceDisplayMode(); } // 透明度トグル
-                    else { performRotation(operation); }
+                    else {
+                        console.log(`[touchend] Performing rotation (swipe): ${operation}`);
+                        // ★修正点: 単一のユーザー回転の場合、アニメーション開始前に現在の表示モードを保存
+                        displayModeBeforeAnimation = currentDisplayMode;
+                        // アニメーションのために一時的に不透明にする（元々透過モードの場合）
+                        if (currentDisplayMode === 'transparent') {
+                            console.log("[touchend] Switching to opaque for animation (swipe).");
+                            currentDisplayMode = 'opaque';
+                            applyFaceDisplayMode();
+                        }
+                        performRotation(operation);
+                    }
                 }
                 // スワイプ後はダブルタップ状態をリセット
                 lastTapTime = 0;
@@ -951,14 +1022,25 @@
                 if (currentTime - lastTapTime < DOUBLE_TAP_TIMEOUT && lastTapNumpad === endNumpad) {
                     // 同じエリアでのダブルタップが検出された
                     const operation = `${endNumpad}-${endNumpad}`;
-                    console.log("Operation (Double Tap):", operation);
+                    console.log("[touchend] Operation (Double Tap):", operation);
                     // テンキー操作を実行
                     if (operation === '0-2') { logCubeState(); }
                     else if (operation === '0-1') { shuffleCube(); }
                     else if (operation === '0-0') { undoLastMove(); }
                     else if (operation === '5-5') { changeCameraView(); }
                     else if (operation === '0-3') { toggleFaceDisplayMode(); } // 透明度トグル
-                    else { performRotation(operation); }
+                    else {
+                        console.log(`[touchend] Performing rotation (double tap): ${operation}`);
+                        // ★修正点: 単一のユーザー回転の場合、アニメーション開始前に現在の表示モードを保存
+                        displayModeBeforeAnimation = currentDisplayMode;
+                        // アニメーションのために一時的に不透明にする（元々透過モードの場合）
+                        if (currentDisplayMode === 'transparent') {
+                            console.log("[touchend] Switching to opaque for animation (double tap).");
+                            currentDisplayMode = 'opaque';
+                            applyFaceDisplayMode();
+                        }
+                        performRotation(operation);
+                    }
 
                     lastTapTime = 0; // 次のタップシーケンスのためにリセット
                     lastTapNumpad = null;
@@ -966,57 +1048,56 @@
                     // シングルタップとして記録
                     lastTapTime = currentTime;
                     lastTapNumpad = endNumpad;
+                    console.log(`[touchend] Single tap recorded: ${endNumpad}`);
                 }
             }
             event.preventDefault(); // ブラウザのデフォルトタッチアクション（スクロールなど）を防ぐ
         });
 
-
         // --- 回転処理のためのグループと状態変数 ---
-        let rotatingGroup = new THREE.Group(); // 回転するキューブレットを一時的にまとめるグループ
-        let isRotating = false; // 現在回転中かどうか
-        let rotationAxis = new THREE.Vector3(); // 回転軸
-        let targetRotationAngle = 0; // 目標の回転角度
-        let currentRotationAngle = 0; // 現在のアニメーション回転角度
-        const rotationSpeed = Math.PI / 15; // 1フレームあたりの回転速度 (シャッフルやアンドゥのために少し速くする)
+        // ★修正点: 上記で宣言済みなので削除
+        // let rotatingGroup = new THREE.Group(); // 回転するキューブレットを一時的にまとめるグループ
+        // let isRotating = false; // 現在回転中かどうか
+        // let rotationAxis = new THREE.Vector3(); // 回転軸
+        // let targetRotationAngle = 0; // 目標の回転角度
+        // let currentRotationAngle = 0; // 現在のアニメーション回転角度
+        // const rotationSpeed = Math.PI / 15; // 1フレームあたりの回転速度 (シャッフルやアンドゥのために少し速くする)
 
         // --- カメラアニメーションのための変数 ---
-        let targetCameraPosition = camera.position.clone(); // カメラの目標位置
-        let targetCameraQuaternion = camera.quaternion.clone(); // カメラの目標クォータニオン (向き)
-        let isCameraAnimating = false; // 現在カメラがアニメーション中かどうか
-        const cameraAnimationSpeed = 0.3; // カメラアニメーションの補間速度 (0.0: 遅い - 1.0: 速い)
-        let currentView = 'TFR'; // 現在のカメラビュー ('TFR': Top-Front-Right, 'TFL': Top-Front-Left)
+        // ★修正点: 上記で宣言済みなので削除
+        // let targetCameraPosition = camera.position.clone(); // カメラの目標位置
+        // let targetCameraQuaternion = camera.quaternion.clone(); // カメラの目標クォータニオン (向き)
+        // let isCameraAnimating = false; // 現在カメラがアニメーション中かどうか
+        // const cameraAnimationSpeed = 0.3; // カメラアニメーションの補間速度 (0.0: 遅い - 1.0: 速い)
+        // let currentView = 'TFR'; // 現在のカメラビュー ('TFR': Top-Front-Right, 'TFL': Top-Front-Left)
 
         // --- シャッフルとアンドゥのための履歴管理 ---
-        const moveHistory = []; // 実行された操作の履歴
-        let shuffleQueue = []; // シャッフル中に実行する操作のキュー
-        let isShuffling = false; // シャッフル中かどうか
-        let isUndoing = false; // アンドゥ中かどうか
+        // ★修正点: 上記で宣言済みなので削除
+        // const moveHistory = []; // 実行された操作の履歴
+        // let shuffleQueue = []; // シャッフル中に実行する操作のキュー
+        // let isShuffling = false; // シャッフル中かどうか
+        // let isUndoing = false; // アンドゥ中かどうか
 
 
         // 指定された操作に基づいてルービックキューブの回転を実行する関数
         // source: 'user', 'shuffle', 'undo' のいずれか。履歴記録の判断に使う
         function performRotation(operation, source = 'user') {
-            // アニメーション開始時、透過モードであれば解除し、復元フラグを設定する
-            if (currentDisplayMode === 'transparent') {
-                restoreTransparencyModeAfterAnimation = true;
-                currentDisplayMode = 'opaque';
-                applyFaceDisplayMode();
-            } else {
-                restoreTransparencyModeAfterAnimation = false; // 透過モードでなければ復元不要
-            }
+//            console.log(`[performRotation] 開始: operation=${operation}, source=${source}. Current states: isRotating=${isRotating}, isCameraAnimating=${isCameraAnimating}, isShuffling=${isShuffling}, isUndoing=${isUndoing}`);
 
             // 回転中またはカメラアニメーション中は、新しい操作を受け付けない
             // ただし、シャッフルやアンドゥ操作自体は回転アニメーションを待つ
             if (isRotating || isCameraAnimating) {
                 if (source === 'shuffle' || source === 'undo') {
                     // シャッフルやアンドゥ中に呼ばれた場合は、現在の回転が完了するまで待機
+//                    console.log("[performRotation] Animation in progress, deferring shuffle/undo step.");
                     return;
                 } else {
                     // ユーザーによる通常の操作の場合は、回転中なら無視
+//                    console.log("[performRotation] Animation in progress, ignoring user input.");
                     return;
                 }
             }
+//            console.log(`[performRotation] Executing rotation: ${operation}`);
 
             let axis = new THREE.Vector3(); // 回転軸
             let angle = 0; // 回転角度
@@ -1131,14 +1212,14 @@
 
 
                 default:
-                    console.log("不明な操作:", operation);
+                    console.log("[performRotation] 不明な操作:", operation);
                     return; // 処理を中断
             }
 
             // 履歴への追加は、アンドゥ操作でない場合に行う
             if (source !== 'undo') {
                 moveHistory.push(operation);
-                console.log("履歴に追加:", operation);
+                console.log("[performRotation] 履歴に追加:", operation);
             }
 
             // キューブ全体を回転させる場合は、全てのキューブレットを選択
@@ -1152,10 +1233,12 @@
             currentRotationAngle = 0;
             isRotating = true;
             updateButtonStates(); // ボタンの状態を更新
+//            console.log(`[performRotation] 完了. isRotating=${isRotating}`);
         }
 
         // 指定された軸位置のキューブレットを選択し、回転グループに追加する関数
         function selectCubeletsByPosition(xVal, yVal, zVal) {
+//            console.log(`[selectCubeletsByPosition] X=${xVal}, Y=${yVal}, Z=${zVal}`);
             // 回転開始時に、全てのキューブレットから枠線を削除
             cubelets.forEach(cubelet => {
                 removeFaceBorders(cubelet);
@@ -1185,11 +1268,14 @@
                 rotatingGroup.add(cubelet);
             });
             scene.add(rotatingGroup); // 回転グループをシーンに追加
+//            console.log(`[selectCubeletsByPosition] Selected ${selectedCubelets.length} cubelets.`);
         }
 
         // 回転完了後にキューブレットのワールド位置と回転を更新し、シーンに再配置する関数
         // source: 'user', 'shuffle', 'undo' のいずれか。次の操作の判断に使う
         function updateCubeletPositions(source = 'user') {
+//            console.log(`[updateCubeletPositions] 開始: source=${source}. currentDisplayMode=${currentDisplayMode}, displayModeBeforeAnimation=${displayModeBeforeAnimation}, isRotating=${isRotating}, isShuffling=${isShuffling}, isUndoing=${isUndoing}`);
+
             // 回転グループ内の全ての子キューブレットを処理
             for (let i = rotatingGroup.children.length - 1; i >= 0; i--) {
                 const cubelet = rotatingGroup.children[i];
@@ -1240,35 +1326,59 @@
             isRotating = false; // 回転アニメーション終了
             updateButtonStates(); // ボタンの状態を更新
 
-            // アニメーション後に透過モードを復元
-            if (restoreTransparencyModeAfterAnimation) {
-                currentDisplayMode = 'transparent';
+            // ★修正点: シャッフル中やアンドゥ中は個々の回転後に透過モードを復元しない。
+            // 透過モードの復元は、シャッフルまたはアンドゥの全シーケンスが完了した時にのみ行う。
+            // ここでのapplyFaceDisplayMode()の直接呼び出しは削除し、以下のロジックに集約
+            if (!isShuffling && !isUndoing) {
+//                console.log("[updateCubeletPositions] Single user move completed. Restoring display mode.");
+                currentDisplayMode = displayModeBeforeAnimation;
+                applyFaceDisplayMode();
             }
-            applyFaceDisplayMode();
 
 
             // シャッフル中であれば次の操作を実行
             if (isShuffling && shuffleQueue.length > 0) {
+//                console.log(`[updateCubeletPositions] Shuffle continuing. Remaining: ${shuffleQueue.length}`);
                 // 少し遅延を入れて次の回転を開始 (アニメーションが見やすくなるように)
                 setTimeout(() => {
+                    // ★修正点: 次の回転操作の前に透過モードの一時的な不透明化を再度適用
+                    if (displayModeBeforeAnimation === 'transparent') {
+//                        console.log("[updateCubeletPositions] Shuffle: Setting to opaque for next step.");
+                        currentDisplayMode = 'opaque';
+                        applyFaceDisplayMode();
+                    }
                     performRotation(shuffleQueue.shift(), 'shuffle');
                 }, 100); // 100msの遅延
             } else if (isShuffling && shuffleQueue.length === 0) {
                 isShuffling = false;
-                console.log("シャッフル完了！");
+//                console.log("[updateCubeletPositions] シャッフル完了！Restoring display mode.");
+                // ★修正点: シャッフル完了後に透過モードを復元
+                currentDisplayMode = displayModeBeforeAnimation;
+                applyFaceDisplayMode();
                 updateButtonStates(); // シャッフル完了時にも更新
             }
 
             // アンドゥ中であれば次の操作を実行
             if (isUndoing && shuffleQueue.length > 0) { // シャッフルと同じキューを利用
+//                console.log(`[updateCubeletPositions] Undo continuing. Remaining: ${shuffleQueue.length}`);
                 setTimeout(() => {
+                    // ★修正点: 次の回転操作の前に透過モードの一時的な不透明化を再度適用
+                    if (displayModeBeforeAnimation === 'transparent') {
+//                        console.log("[updateCubeletPositions] Undo: Setting to opaque for next step.");
+                        currentDisplayMode = 'opaque';
+                        applyFaceDisplayMode();
+                    }
                     performRotation(shuffleQueue.shift(), 'undo'); // アンドゥの逆操作を実行
                 }, 100); // 100msの遅延
             } else if (isUndoing && shuffleQueue.length === 0) {
                 isUndoing = false;
-                console.log("アンドゥ完了！");
-                updateButtonStates(); // アンドゥ完了時にも更新
+//                console.log("[updateCubeletPositions] アンドゥ完了！Restoring display mode.");
+                // ★修正点: アンドゥ完了後に透過モードを復元
+                currentDisplayMode = displayModeBeforeAnimation;
+                applyFaceDisplayMode();
+                updateButtonStates();
             }
+//            console.log(`[updateCubeletPositions] 完了. currentDisplayMode=${currentDisplayMode}`);
         }
 
         // --- シャッフル機能 ---
@@ -1288,18 +1398,23 @@
         ];
 
         async function shuffleCube() {
-            // アニメーション開始時、透過モードであれば解除し、復元フラグを設定する
+            console.log(`[shuffleCube] 開始. currentDisplayMode=${currentDisplayMode}, displayModeBeforeAnimation=${displayModeBeforeAnimation}`);
+            // ★修正点: アニメーション開始前に現在の表示モードを保存する
+            displayModeBeforeAnimation = currentDisplayMode;
+
+            // アニメーションのために一時的に不透明にする（元々透過モードの場合）
             if (currentDisplayMode === 'transparent') {
-                restoreTransparencyModeAfterAnimation = true;
+                console.log("[shuffleCube] Setting to opaque for shuffle animation.");
                 currentDisplayMode = 'opaque';
                 applyFaceDisplayMode();
-            } else {
-                restoreTransparencyModeAfterAnimation = false;
             }
 
-            if (isRotating || isShuffling || isUndoing || isCameraAnimating) return; // 回転中やシャッフル中は無視
+            if (isRotating || isShuffling || isUndoing || isCameraAnimating) {
+                console.log("[shuffleCube] Animation in progress, ignoring shuffle request.");
+                return; // 回転中やシャッフル中は無視
+            }
 
-            console.log("シャッフルを開始します...");
+            console.log("[shuffleCube] シャッフルを開始します...");
             isShuffling = true;
             shuffleQueue = []; // シャッフル操作のキューをクリア
 
@@ -1314,27 +1429,33 @@
             // 最初のシャッフル操作を開始
             performRotation(shuffleQueue.shift(), 'shuffle');
             updateButtonStates(); // シャッフル開始時にも更新
+            console.log("[shuffleCube] 完了. First rotation initiated.");
         }
 
         // --- アンドゥ機能 ---
         function undoLastMove() {
-            // アニメーション開始時、透過モードであれば解除し、復元フラグを設定する
+            console.log(`[undoLastMove] 開始. currentDisplayMode=${currentDisplayMode}, displayModeBeforeAnimation=${displayModeBeforeAnimation}`);
+            // ★修正点: アニメーション開始前に現在の表示モードを保存する
+            displayModeBeforeAnimation = currentDisplayMode;
+
+            // アニメーションのために一時的に不透明にする（元々透過モードの場合）
             if (currentDisplayMode === 'transparent') {
-                restoreTransparencyModeAfterAnimation = true;
+                console.log("[undoLastMove] Setting to opaque for undo animation.");
                 currentDisplayMode = 'opaque';
                 applyFaceDisplayMode();
-            } else {
-                restoreTransparencyModeAfterAnimation = false;
             }
 
-            if (isRotating || isCameraAnimating || isShuffling || isUndoing) return; // 回転中やシャッフル中は無視
+            if (isRotating || isCameraAnimating || isShuffling || isUndoing) {
+                console.log("[undoLastMove] Animation in progress, ignoring undo request.");
+                return; // 回転中やシャッフル中は無視
+            }
 
             if (moveHistory.length === 0) {
-                console.log("アンドゥできる操作がありません。");
+                console.log("[undoLastMove] アンドゥできる操作がありません。");
                 return;
             }
 
-            console.log("アンドゥを開始します...");
+            console.log("[undoLastMove] アンドゥを開始します...");
             isUndoing = true;
             shuffleQueue = []; // アンドゥ操作のキューをクリア（シャッフルと同じキューを利用）
 
@@ -1344,12 +1465,13 @@
             if (reverseMove) {
                 shuffleQueue.push(reverseMove); // 逆操作をキューに追加
                 performRotation(shuffleQueue.shift(), 'undo'); // 逆操作を実行
-                console.log(`直前の操作 "${lastMove}" をアンドゥしました。逆操作: "${reverseMove}"`);
+                console.log(`[undoLastMove] 直前の操作 "${lastMove}" をアンドゥしました。逆操作: "${reverseMove}"`);
             } else {
-                console.log(`逆操作が定義されていません: ${lastMove}`);
+                console.log(`[undoLastMove] 逆操作が定義されていません: ${lastMove}`);
                 isUndoing = false;
             }
             updateButtonStates(); // アンドゥ開始時にも更新
+            console.log("[undoLastMove] 完了. First rotation initiated.");
         }
 
         // 操作の逆操作を取得するヘルパー関数
@@ -1425,14 +1547,15 @@
             requestAnimationFrame(animate); // 次のフレームで再度この関数を呼び出す
 
             // デバッグログ追加: 現在のアニメーション状態を表示
-            // console.log(`Flags: R=${isRotating}, CA=${isCameraAnimating}, S=${isShuffling}, U=${isUndoing}`);
+            // console.log(`[animate] Loop: isRotating=${isRotating}, isCameraAnimating=${isCameraAnimating}, isShuffling=${isShuffling}, isUndoing=${isUndoing}`);
 
             if (isRotating) {
                 let angleStep = rotationSpeed;
                 // 目標角度に近づいたら残りの角度に調整し、回転を終了
                 if (Math.abs(targetRotationAngle - currentRotationAngle) < angleStep) {
                     angleStep = Math.abs(targetRotationAngle - currentRotationAngle);
-                    isRotating = false;
+                    isRotating = false; // 回転アニメーションの完了をマーク
+//                    console.log("[animate] Rotation animation completed. Calling updateCubeletPositions.");
                 }
                 // 回転クォータニオンを作成し、回転グループに適用
                 const rotateQuaternion = new THREE.Quaternion();
@@ -1440,7 +1563,7 @@
                 rotatingGroup.applyQuaternion(rotateQuaternion);
                 currentRotationAngle += (targetRotationAngle > currentRotationAngle ? angleStep : -angleStep);
 
-                if (!isRotating) {
+                if (!isRotating) { // 回転が完了したフレームで一度だけ呼び出す
                     // isShuffling と isUndoing の状態に基づいて source を決定
                     const source = isShuffling ? 'shuffle' : (isUndoing ? 'undo' : 'user');
                     updateCubeletPositions(source);
@@ -1459,12 +1582,10 @@
                     camera.position.copy(targetCameraPosition); // 完全に目標位置に設定
                     camera.quaternion.copy(targetCameraQuaternion); // 完全に目標向きに設定
                     isCameraAnimating = false;
-                    console.log("カメラアニメーション完了。");
+//                    console.log("[animate] カメラアニメーション完了。Restoring display mode.");
                     updateButtonStates(); // カメラアニメーション完了時にも更新
-                    // アニメーション後に透過モードを復元
-                    if (restoreTransparencyModeAfterAnimation) {
-                        currentDisplayMode = 'transparent';
-                    }
+                    // ★修正点: アニメーション後に透過モードを復元
+                    currentDisplayMode = displayModeBeforeAnimation;
                     applyFaceDisplayMode();
                 }
             }
@@ -1474,6 +1595,7 @@
 
         // ウィンドウのリサイズイベントに対応
         window.addEventListener('resize', () => {
+            console.log("[resize] Window resized.");
             const width = window.innerWidth;
             const height = window.innerHeight;
 
@@ -1489,16 +1611,21 @@
 
         // --- カメラビュー変更関数 ---
         function changeCameraView() {
-            // アニメーション開始時、透過モードであれば解除し、復元フラグを設定する
+//            console.log(`[changeCameraView] 開始. currentDisplayMode=${currentDisplayMode}, displayModeBeforeAnimation=${displayModeBeforeAnimation}`);
+            // ★修正点: アニメーション開始前に現在の表示モードを保存する
+            displayModeBeforeAnimation = currentDisplayMode;
+
+            // アニメーションのために一時的に不透明にする（元々透過モードの場合）
             if (currentDisplayMode === 'transparent') {
-                restoreTransparencyModeAfterAnimation = true;
+//                console.log("[changeCameraView] Setting to opaque for camera animation.");
                 currentDisplayMode = 'opaque';
                 applyFaceDisplayMode();
-            } else {
-                restoreTransparencyModeAfterAnimation = false;
             }
 
-            if (isCameraAnimating || isRotating || isShuffling || isUndoing) return; // アニメーション中は新しい操作を受け付けない
+            if (isCameraAnimating || isRotating || isShuffling || isUndoing) {
+//                console.log("[changeCameraView] Animation in progress, ignoring camera view change request.");
+                return; // アニメーション中は新しい操作を受け付けない
+            }
 
             let newPosition = new THREE.Vector3();
             let newLookAt = new THREE.Vector3(0, 0, 0); // 常に原点を見る
@@ -1506,12 +1633,12 @@
             if (currentView === 'TFR') {
                 // 現在のビューがTop-Front-Rightなら、Top-Front-Leftへ切り替え
                 newPosition.set(-200, 200, 600); // 左上奥からの視点 (調整済み)
-                console.log("カメラビューをTop-Front-Leftに変更します。");
+//                console.log("[changeCameraView] カメラビューをTop-Front-Leftに変更します。");
                 currentView = 'TFL';
             } else {
                 // 現在のビューがTop-Front-Leftなら、Top-Front-Rightへ切り替え
                 newPosition.set(200, 200, 600); // 右上奥からの視点 (初期値、調整済み)
-                console.log("カメラビューをTop-Front-Rightに変更します。");
+//                console.log("[changeCameraView] カメラビューをTop-Front-Rightに変更します。");
                 currentView = 'TFR';
             }
 
@@ -1524,6 +1651,7 @@
 
             isCameraAnimating = true; // カメラアニメーションを開始
             updateButtonStates(); // カメラアニメーション開始時にも更新
+//            console.log("[changeCameraView] 完了. Camera animation started.");
         }
 
 
@@ -1670,6 +1798,7 @@
         // ボタンの活性/非活性を制御する関数
         function updateButtonStates() {
             const isAnyAnimationInProgress = isRotating || isCameraAnimating || isShuffling || isUndoing;
+//            console.log(`[updateButtonStates] isAnyAnimationInProgress=${isAnyAnimationInProgress}, history_length=${moveHistory.length}`);
 
             if (shuffleButton) { // 存在を確認
                 shuffleButton.disabled = isAnyAnimationInProgress;
