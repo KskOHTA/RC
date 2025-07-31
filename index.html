@@ -60,7 +60,7 @@
 
         #controls button {
             padding: 10px 15px;
-            font-size: 0.8em;
+            font-size: 1em;
             background-color: #007bff;
             color: white;
             border: none;
@@ -566,6 +566,8 @@
 
         // --- 透明度/枠線制御のための変数と関数 ---
         let currentDisplayMode = 'opaque'; // 'opaque': 不透明, 'transparent': 透過モード
+        // アニメーション後に透過モードを復元するかどうか
+        let restoreTransparencyModeAfterAnimation = false;
 
         // BoxGeometryの面の法線 (ローカル座標)
         // 順序はTHREE.BoxGeometryの面の順序に厳密に従う:
@@ -681,6 +683,12 @@
         }
 
         function toggleFaceDisplayMode() {
+            // アニメーション中は透過モードの切り替えを無効化
+            if (isRotating || isCameraAnimating || isShuffling || isUndoing) {
+                console.log("アニメーション中は透過モードの切り替えはできません。");
+                return;
+            }
+
             currentDisplayMode = (currentDisplayMode === 'opaque') ? 'transparent' : 'opaque';
             applyFaceDisplayMode();
         }
@@ -751,10 +759,10 @@
                                 mat.depthWrite = false; // 描画しないので深度書き込みも不要
                                 addFaceBorders(cubelet, materialIndex, mat.originalColorHex); // 額縁を追加
                             } else {
-                                // それ以外の外側の面 (Bottom, Left/Right, Backなど) は半透明にする
-                                mat.transparent = true;
-                                mat.opacity = 1.0; // 半透明にして、裏側の面が見えるようにする
-                                mat.depthWrite = false; // 深度書き込みを無効にして、後方のオブジェクトが描画されるようにする
+                                // それ以外の外側の面 (Bottom, Left/Right, Backなど) は不透明にする
+                                mat.transparent = false; // ここをfalseに
+                                mat.opacity = 1.0; // ここを1.0に
+                                mat.depthWrite = true; // ここをtrueに
                             }
                         }
                     } else { // 不透明モード ('opaque')
@@ -989,6 +997,15 @@
         // 指定された操作に基づいてルービックキューブの回転を実行する関数
         // source: 'user', 'shuffle', 'undo' のいずれか。履歴記録の判断に使う
         function performRotation(operation, source = 'user') {
+            // アニメーション開始時、透過モードであれば解除し、復元フラグを設定する
+            if (currentDisplayMode === 'transparent') {
+                restoreTransparencyModeAfterAnimation = true;
+                currentDisplayMode = 'opaque';
+                applyFaceDisplayMode();
+            } else {
+                restoreTransparencyModeAfterAnimation = false; // 透過モードでなければ復元不要
+            }
+
             // 回転中またはカメラアニメーション中は、新しい操作を受け付けない
             // ただし、シャッフルやアンドゥ操作自体は回転アニメーションを待つ
             if (isRotating || isCameraAnimating) {
@@ -1222,7 +1239,13 @@
 
             isRotating = false; // 回転アニメーション終了
             updateButtonStates(); // ボタンの状態を更新
-            applyFaceDisplayMode(); // 回転後に描画モードを再適用
+
+            // アニメーション後に透過モードを復元
+            if (restoreTransparencyModeAfterAnimation) {
+                currentDisplayMode = 'transparent';
+            }
+            applyFaceDisplayMode();
+
 
             // シャッフル中であれば次の操作を実行
             if (isShuffling && shuffleQueue.length > 0) {
@@ -1265,6 +1288,15 @@
         ];
 
         async function shuffleCube() {
+            // アニメーション開始時、透過モードであれば解除し、復元フラグを設定する
+            if (currentDisplayMode === 'transparent') {
+                restoreTransparencyModeAfterAnimation = true;
+                currentDisplayMode = 'opaque';
+                applyFaceDisplayMode();
+            } else {
+                restoreTransparencyModeAfterAnimation = false;
+            }
+
             if (isRotating || isShuffling || isUndoing || isCameraAnimating) return; // 回転中やシャッフル中は無視
 
             console.log("シャッフルを開始します...");
@@ -1286,6 +1318,15 @@
 
         // --- アンドゥ機能 ---
         function undoLastMove() {
+            // アニメーション開始時、透過モードであれば解除し、復元フラグを設定する
+            if (currentDisplayMode === 'transparent') {
+                restoreTransparencyModeAfterAnimation = true;
+                currentDisplayMode = 'opaque';
+                applyFaceDisplayMode();
+            } else {
+                restoreTransparencyModeAfterAnimation = false;
+            }
+
             if (isRotating || isCameraAnimating || isShuffling || isUndoing) return; // 回転中やシャッフル中は無視
 
             if (moveHistory.length === 0) {
@@ -1420,7 +1461,11 @@
                     isCameraAnimating = false;
                     console.log("カメラアニメーション完了。");
                     updateButtonStates(); // カメラアニメーション完了時にも更新
-                    applyFaceDisplayMode(); // カメラアニメーション完了後に描画モードを再適用
+                    // アニメーション後に透過モードを復元
+                    if (restoreTransparencyModeAfterAnimation) {
+                        currentDisplayMode = 'transparent';
+                    }
+                    applyFaceDisplayMode();
                 }
             }
 
@@ -1444,6 +1489,15 @@
 
         // --- カメラビュー変更関数 ---
         function changeCameraView() {
+            // アニメーション開始時、透過モードであれば解除し、復元フラグを設定する
+            if (currentDisplayMode === 'transparent') {
+                restoreTransparencyModeAfterAnimation = true;
+                currentDisplayMode = 'opaque';
+                applyFaceDisplayMode();
+            } else {
+                restoreTransparencyModeAfterAnimation = false;
+            }
+
             if (isCameraAnimating || isRotating || isShuffling || isUndoing) return; // アニメーション中は新しい操作を受け付けない
 
             let newPosition = new THREE.Vector3();
@@ -1470,7 +1524,6 @@
 
             isCameraAnimating = true; // カメラアニメーションを開始
             updateButtonStates(); // カメラアニメーション開始時にも更新
-            applyFaceDisplayMode(); // カメラアニメーション完了後に描画モードを再適用
         }
 
 
