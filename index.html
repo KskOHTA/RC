@@ -60,7 +60,7 @@
 
         #controls button {
             padding: 10px 15px;
-            font-size: 0.9em;
+            font-size: 1em;
             background-color: #007bff;
             color: white;
             border: none;
@@ -417,14 +417,14 @@
                     </thead>
                     <tbody>
                         <tr>
-                            <td>カメラ視点をTop, Front, RightとTop, Front, Leftで切り替え</td>
+                            <td>カメラ視点をTop, Front, RightとTop, Front, Leftで切り替え (アニメーション)</td>
                             <td>
                                 <strong>5-5</strong>
                             </td>
                         </tr>
                         <tr>
                             <td>
-                                <strong>キューブをシャッフル</strong>
+                                <strong>キューブをシャッフル</strong> (アニメーション付き)
                             </td>
                             <td>
                                 <strong>0-1</strong>
@@ -440,7 +440,7 @@
                         <tr>
                             <td>
                                 <strong>キューブ全体を透過/不透過に切り替え</strong>
-                                <br>
+                                <br>(透過時はキューブのTop, Front, Rightの9x3面が枠線表示になり、内側の面は非表示になります)
                             </td>
                             <td>
                                 <strong>0-3</strong>
@@ -860,11 +860,11 @@
                         // ★修正点: 単一のユーザー回転の場合、アニメーション開始前に現在の表示モードを保存
                         displayModeBeforeAnimation = currentDisplayMode;
                         // アニメーションのために一時的に不透明にする（元々透過モードの場合）
-                        if (currentDisplayMode === 'transparent') {
-//                            console.log("[keydown] Switching to opaque for animation.");
-                            currentDisplayMode = 'opaque';
-                            applyFaceDisplayMode();
-                        }
+////                        if (currentDisplayMode === 'transparent') {
+//////                            console.log("[keydown] Switching to opaque for animation.");
+////                            currentDisplayMode = 'opaque';
+////                            applyFaceDisplayMode();
+////                        }
                         // ルービックキューブの回転操作を実行
                         performRotation(operation);
                     }
@@ -1002,12 +1002,12 @@
                         console.log(`[touchend] Performing rotation (swipe): ${operation}`);
                         // ★修正点: 単一のユーザー回転の場合、アニメーション開始前に現在の表示モードを保存
                         displayModeBeforeAnimation = currentDisplayMode;
-                        // アニメーションのために一時的に不透明にする（元々透過モードの場合）
-                        if (currentDisplayMode === 'transparent') {
-                            console.log("[touchend] Switching to opaque for animation (swipe).");
-                            currentDisplayMode = 'opaque';
-                            applyFaceDisplayMode();
-                        }
+////                        // アニメーションのために一時的に不透明にする（元々透過モードの場合）
+////                        if (currentDisplayMode === 'transparent') {
+////                            console.log("[touchend] Switching to opaque for animation (swipe).");
+////                            currentDisplayMode = 'opaque';
+////                            applyFaceDisplayMode();
+////                        }
                         performRotation(operation);
                     }
                 }
@@ -1034,11 +1034,11 @@
                         // ★修正点: 単一のユーザー回転の場合、アニメーション開始前に現在の表示モードを保存
                         displayModeBeforeAnimation = currentDisplayMode;
                         // アニメーションのために一時的に不透明にする（元々透過モードの場合）
-                        if (currentDisplayMode === 'transparent') {
-                            console.log("[touchend] Switching to opaque for animation (double tap).");
-                            currentDisplayMode = 'opaque';
-                            applyFaceDisplayMode();
-                        }
+////                        if (currentDisplayMode === 'transparent') {
+////                            console.log("[touchend] Switching to opaque for animation (double tap).");
+////                            currentDisplayMode = 'opaque';
+////                            applyFaceDisplayMode();
+////                        }
                         performRotation(operation);
                     }
 
@@ -1216,6 +1216,11 @@
                     return; // 処理を中断
             }
 
+// 有効な操作の場合のみ、アニメーション準備としてモードを切り替える
+if (currentDisplayMode === 'transparent') {
+    currentDisplayMode = 'opaque';
+    applyFaceDisplayMode();
+}
             // 履歴への追加は、アンドゥ操作でない場合に行う
             if (source !== 'undo') {
                 moveHistory.push(operation);
