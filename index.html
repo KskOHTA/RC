@@ -753,7 +753,7 @@
                             } else {
                                 // それ以外の外側の面 (Bottom, Left/Right, Backなど) は半透明にする
                                 mat.transparent = true;
-                                mat.opacity = 0.2; // 半透明にして、裏側の面が見えるようにする
+                                mat.opacity = 1.0; // 半透明にして、裏側の面が見えるようにする
                                 mat.depthWrite = false; // 深度書き込みを無効にして、後方のオブジェクトが描画されるようにする
                             }
                         }
