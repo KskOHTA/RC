@@ -440,7 +440,7 @@
                         <tr>
                             <td>
                                 <strong>キューブ全体を透過/不透過に切り替え</strong>
-                                <br>(透過時はキューブのTop, Front, Rightの9x3面が半透明になり、内側の面は非表示になります)
+                                <br>(透過時はキューブのTop, Front, Rightの9x3面が枠線表示になり、内側の面は非表示になります)
                             </td>
                             <td>
                                 <strong>0-3</strong>
@@ -460,7 +460,7 @@
         <button id="toggleTransparencyButton">透過</button>
     </div>
 
-    <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
     <script>
         // --- シーンの初期設定 ---
         const scene = new THREE.Scene();
@@ -512,6 +512,10 @@
         const gap = 2; // キューブレット間の隙間
         const gridUnit = (cubeSize + gap); // 論理グリッドの単位
 
+        // 枠線の設定
+        const borderThickness = 3; // 枠線の太さ
+        const borderOffset = 0.5; // 枠線を面からわずかに浮かせZ-fightingを防ぐためのオフセット
+
         // --- 個々のキューブレット (ミニキューブ) の作成 ---
         for (let x = -1; x <= 1; x++) {
             for (let y = -1; y <= 1; y++) {
@@ -550,6 +554,7 @@
                         }
                     });
 
+                    // BoxGeometryにマテリアル配列を渡す
                     const cubelet = new THREE.Mesh(geometry, materials);
                     // キューブレットの位置を設定（中央のキューブを原点とする）
                     cubelet.position.set(x * gridUnit, y * gridUnit, z * gridUnit);
@@ -559,8 +564,8 @@
             }
         }
 
-        // --- 透明度制御のための変数と関数 ---
-        let currentTransparency = 1.0; // 1.0 = 不透明, 0.0 = 100%透過 (完全透明)
+        // --- 透明度/枠線制御のための変数と関数 ---
+        let currentDisplayMode = 'opaque'; // 'opaque': 不透明, 'transparent': 透過モード
 
         // BoxGeometryの面の法線 (ローカル座標)
         // 順序はTHREE.BoxGeometryの面の順序に厳密に従う:
@@ -583,97 +588,177 @@
         const worldTopAxis = new THREE.Vector3(0, 1, 0);
         const worldFrontAxis = new THREE.Vector3(0, 0, 1);
         const worldRightAxis = new THREE.Vector3(1, 0, 0);
-        const worldLeftAxis = new THREE.Vector3(-1, 0, 0);
-        const worldBottomAxis = new THREE.Vector3(0, -1, 0);
-        const worldBackAxis = new THREE.Vector3(0, 0, -1);
 
         const dotTolerance = 0.9; // ドット積の許容誤差 (ベクトルがほぼ平行であることを判定)
 
+        // 指定されたキューブレットの面に対して額縁を作成し追加する関数
+        function addFaceBorders(cubelet, materialIndex, originalFaceColor) {
+            const faceNormal = localFaceNormals[materialIndex].clone(); // その面のローカル法線
+            const borderMaterial = new THREE.MeshLambertMaterial({ color: originalFaceColor, side: THREE.DoubleSide });
 
-        function toggleFrontFaceTransparency() {
-            // 0.0 (透過モード) と 1.0 (不透明モード) を切り替える
-            currentTransparency = (currentTransparency === 1.0) ? 0.0 : 1.0;
-            applyFrontFaceTransparency();
+            const halfCubeSize = cubeSize / 2;
+            const borderHalfThickness = borderThickness / 2;
+            const offsetFromFace = halfCubeSize + borderOffset; // Z-fightingを防ぐためのオフセット
+
+            const strips = [];
+
+            // 額縁の各辺を構成するジオメトリを定義
+            // これらは、面がXY平面（法線がZ軸方向）にあると仮定して定義されます。
+            const longStripGeom = new THREE.BoxGeometry(cubeSize, borderThickness, borderThickness);
+            const shortStripGeom = new THREE.BoxGeometry(borderThickness, cubeSize - 2 * borderThickness, borderThickness);
+
+            // 4つの額縁メッシュを作成
+            const stripTop = new THREE.Mesh(longStripGeom, borderMaterial);
+            const stripBottom = new THREE.Mesh(longStripGeom, borderMaterial);
+            const stripLeft = new THREE.Mesh(shortStripGeom, borderMaterial);
+            const stripRight = new THREE.Mesh(shortStripGeom, borderMaterial);
+
+            // 面がZ+方向（前面）にあると仮定して、各ストリップの位置を設定
+            stripTop.position.set(0, halfCubeSize - borderHalfThickness, 0);
+            stripBottom.position.set(0, -(halfCubeSize - borderHalfThickness), 0);
+            stripLeft.position.set(-(halfCubeSize - borderHalfThickness), 0, 0);
+            stripRight.position.set(halfCubeSize - borderHalfThickness, 0, 0);
+
+            // 面の向きに合わせてストリップを回転させるためのクォータニオンを計算
+            const faceQuaternion = new THREE.Quaternion();
+            const tempObject = new THREE.Object3D(); // ヘルパーオブジェクト
+
+            switch (materialIndex) {
+                case 0: // Right (+X)
+                    tempObject.rotation.y = Math.PI / 2;
+                    break;
+                case 1: // Left (-X)
+                    tempObject.rotation.y = -Math.PI / 2;
+                    break;
+                case 2: // Top (+Y)
+                    tempObject.rotation.x = -Math.PI / 2;
+                    break;
+                case 3: // Bottom (-Y)
+                    tempObject.rotation.x = Math.PI / 2;
+                    break;
+                case 4: // Front (+Z)
+                    // Z+面は回転不要
+                    break;
+                case 5: // Back (-Z)
+                    tempObject.rotation.y = Math.PI;
+                    break;
+            }
+            faceQuaternion.copy(tempObject.quaternion);
+
+            [stripTop, stripBottom, stripLeft, stripRight].forEach(strip => {
+                // ストリップの位置と回転にクォータニオンを適用
+                strip.position.applyQuaternion(faceQuaternion);
+                strip.quaternion.copy(faceQuaternion);
+
+                // 最終的なオフセットを面の法線方向に適用
+                strip.position.add(faceNormal.clone().multiplyScalar(offsetFromFace));
+
+                strip.userData.isBorderRect = true; // 枠線であることを示すフラグ
+                strip.userData.materialIndex = materialIndex; // 元の面の materialIndex を保存
+                strip.renderOrder = 1; // 枠線をキューブレットの手前に描画
+                cubelet.add(strip);
+            });
         }
 
-        function applyFrontFaceTransparency() {
+        // 指定されたキューブレットから枠線を削除する関数
+        function removeFaceBorders(cubelet) {
+            // 一時的に子要素の配列をコピーして、ループ中に要素を削除できるようにする
+            const childrenToRemove = cubelet.children.filter(child => child.userData.isBorderRect);
+
+            childrenToRemove.forEach(child => {
+                cubelet.remove(child);
+                // メモリリークを防ぐためにジオメトリとマテリアルを解放
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(mat => mat.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+        }
+
+        function toggleFaceDisplayMode() {
+            currentDisplayMode = (currentDisplayMode === 'opaque') ? 'transparent' : 'opaque';
+            applyFaceDisplayMode();
+        }
+
+        function applyFaceDisplayMode() {
             cubelets.forEach(cubelet => {
+                // まず、既存の枠線を全て削除
+                removeFaceBorders(cubelet);
+
                 cubelet.updateMatrixWorld(); // ワールド行列を更新
 
-                // 各キューブレットの論理的なグリッド位置 (X, Y, Z) を取得
-                const worldPosition = new THREE.Vector3();
-                cubelet.getWorldPosition(worldPosition);
-                const gridX = Math.round(worldPosition.x / gridUnit);
-                const gridY = Math.round(worldPosition.y / gridUnit);
-                const gridZ = Math.round(worldPosition.z / gridUnit);
+                const materialsToProcess = Array.isArray(cubelet.material) ? cubelet.material : [cubelet.material];
 
-                cubelet.material.forEach((mat, materialIndex) => {
-                    // 初期色が黒であれば内側の面（センターキューブレットの面や、他のキューブレットの内側の面）
-                    const isInnerFaceOriginal = (mat.color.getHex() === colors.black);
+                materialsToProcess.forEach((mat, materialIndex) => {
+                    // 最初にマテリアルにオリジナルカラーを保存 (透明度が設定される前に)
+                    if (mat.originalColorHex === undefined) {
+                        mat.originalColorHex = mat.color.getHex();
+                    }
 
-                    if (currentTransparency === 0.0) { // 透過モードがアクティブな場合
+                    const isInnerFaceOriginal = (mat.originalColorHex === colors.black); // オリジナルカラーで内側の面か判定
+
+                    if (currentDisplayMode === 'transparent') { // 透過モード
                         if (isInnerFaceOriginal) {
-                            // 内側の面は完全に非表示
+                            // 内側の面は常に非表示
                             mat.transparent = true;
                             mat.opacity = 0.0;
-                            mat.depthWrite = false; // 深度バッファへの書き込みを停止
+                            mat.depthWrite = false; // 透明なオブジェクトは深度バッファに書き込まない
                         } else {
                             // 外側の面の場合
                             const worldNormal = localFaceNormals[materialIndex].clone().applyQuaternion(cubelet.quaternion);
 
-                            // 面が「Top」「Front」「Right」のいずれかであるか、かつ対応する外側レイヤーにあるかを判定
-                            let isSemiTransparentFace = false;
-                            if (worldNormal.dot(worldTopAxis) > dotTolerance && gridY === 1) { // Top面 (+Y)
-                                isSemiTransparentFace = true;
-                            } else if (worldNormal.dot(worldFrontAxis) > dotTolerance && gridZ === 1) { // Front面 (+Z)
-                                isSemiTransparentFace = true;
-                            } else if (worldNormal.dot(worldRightAxis) > dotTolerance && gridX === 1) { // Right面 (+X)
-                                isSemiTransparentFace = true;
+                            // 面が「Top」「Front」「Right」のいずれかであるかを判定
+                            let isFramedFace = false; // 枠線表示の対象面
+                            
+                            const worldPosition = new THREE.Vector3();
+                            cubelet.getWorldPosition(worldPosition);
+                            const gridX = Math.round(worldPosition.x / gridUnit);
+                            const gridY = Math.round(worldPosition.y / gridUnit);
+                            const gridZ = Math.round(worldPosition.z / gridUnit);
+
+                            // Top (+Y), Front (+Z), Right (+X) のいずれかの外側の面であるか
+                            // そして、その面がそれぞれの軸の外側（1または-1）に位置しているかを確認
+                            // (例えば、gridY === 1 はY軸の最上層であることを意味します)
+                            // 精度誤差を考慮した判定
+                            const normalizedWorldNormal = worldNormal.clone().normalize(); // 正規化してドット積を正確にする
+
+                            if (Math.abs(gridY) === 1 && Math.abs(normalizedWorldNormal.dot(worldTopAxis)) > dotTolerance && gridY === 1) { // Top面 (+Y)
+                                isFramedFace = true;
+                            } else if (Math.abs(gridZ) === 1 && Math.abs(normalizedWorldNormal.dot(worldFrontAxis)) > dotTolerance && gridZ === 1) { // Front面 (+Z)
+                                isFramedFace = true;
+                            } else if (Math.abs(gridX) === 1 && Math.abs(normalizedWorldNormal.dot(worldRightAxis)) > dotTolerance && gridX === 1) { // Right面 (+X)
+                                isFramedFace = true;
                             }
 
-                            // 面が「Left」「Bottom」「Back」のいずれかであるか、かつ対応する外側レイヤーにあるかを判定
-                            let isOpaqueFace = false;
-                            if (worldNormal.dot(worldLeftAxis) > dotTolerance && gridX === -1) { // Left面 (-X)
-                                isOpaqueFace = true;
-                            } else if (worldNormal.dot(worldBottomAxis) > dotTolerance && gridY === -1) { // Bottom面 (-Y)
-                                isOpaqueFace = true;
-                            } else if (worldNormal.dot(worldBackAxis) > dotTolerance && gridZ === -1) { // Back面 (-Z)
-                                isOpaqueFace = true;
-                            }
-
-                            if (isSemiTransparentFace) {
-                                mat.transparent = true;
-                                mat.opacity = 0.2; // 半透明
-                                mat.depthWrite = true; // 深度バッファへの書き込みは維持
-                                mat.side = THREE.DoubleSide; // 裏側も描画
-                            } else if (isOpaqueFace) {
-                                mat.transparent = false; // 不透明にする
-                                mat.opacity = 1.0; // 完全不透明
-                                mat.depthWrite = true; // 深度バッファへの書き込みを有効にする
-                                mat.side = THREE.DoubleSide; // 裏側も描画
-                            } else {
-                                // 上記条件を満たさない外側の面 (Should not happen for outer faces once all 6 are covered)
-                                // 基本的には隠されるべきではない面（例：中心にあるキューブレットの外側ではない面など）
-                                // ここに来るべきではないが、念のため隠す設定
+                            if (isFramedFace) {
+                                // 対象の面は完全に透明にし、額縁を追加 (元の色で)
                                 mat.transparent = true;
                                 mat.opacity = 0.0;
-                                mat.depthWrite = false;
+                                mat.depthWrite = false; // 描画しないので深度書き込みも不要
+                                addFaceBorders(cubelet, materialIndex, mat.originalColorHex); // 額縁を追加
+                            } else {
+                                // それ以外の外側の面 (Bottom, Left, Rearなど) は不透明のまま
+                                mat.transparent = false;
+                                mat.opacity = 1.0;
+                                mat.depthWrite = true;
                             }
                         }
-                    } else { // 非透過モードがアクティブな場合
-                        // すべての面を不透明にする
+                    } else { // 不透明モード ('opaque')
                         mat.transparent = false;
                         mat.opacity = 1.0;
-                        mat.depthWrite = true; // 深度バッファへの書き込みを有効にする
-                        mat.side = THREE.DoubleSide; // 両面描画
+                        mat.depthWrite = true;
                     }
-                    mat.needsUpdate = true; // マテリアルの更新をTHREE.jsに通知
+                    mat.needsUpdate = true;
                 });
             });
         }
 
-        // 初期状態で透明度を適用 (デフォルトは非透過)
-        applyFrontFaceTransparency();
+        // 初期状態でディスプレイモードを適用 (デフォルトは不透明)
+        applyFaceDisplayMode();
 
 
         // --- キー入力処理 ---
@@ -704,7 +789,7 @@
                     } else if (operation === '5-5') { // カメラ視点変更
                         changeCameraView();
                     } else if (operation === '0-3') { // 透明度トグル
-                        toggleFrontFaceTransparency();
+                        toggleFaceDisplayMode();
                     }
                     else {
                         // ルービックキューブの回転操作を実行
@@ -795,7 +880,7 @@
             console.log(`touchstart: startNumpad=${startNumpad}`); // デバッグログ追加
 
             event.preventDefault(); // スクロールを防ぐ
-        });
+        }, { passive: true }); // passive: true を追加
 
         renderer.domElement.addEventListener('touchend', (event) => {
             if (isRotating || isCameraAnimating || isShuffling || isUndoing) {
@@ -834,7 +919,7 @@
                     else if (operation === '0-1') { shuffleCube(); }
                     else if (operation === '0-0') { undoLastMove(); }
                     else if (operation === '5-5') { changeCameraView(); }
-                    else if (operation === '0-3') { toggleFrontFaceTransparency(); } // 透明度トグル
+                    else if (operation === '0-3') { toggleFaceDisplayMode(); } // 透明度トグル
                     else { performRotation(operation); }
                 }
                 // スワイプ後はダブルタップ状態をリセット
@@ -854,7 +939,7 @@
                     else if (operation === '0-1') { shuffleCube(); }
                     else if (operation === '0-0') { undoLastMove(); }
                     else if (operation === '5-5') { changeCameraView(); }
-                    else if (operation === '0-3') { toggleFrontFaceTransparency(); } // 透明度トグル
+                    else if (operation === '0-3') { toggleFaceDisplayMode(); } // 透明度トグル
                     else { performRotation(operation); }
 
                     lastTapTime = 0; // 次のタップシーケンスのためにリセット
@@ -1044,6 +1129,11 @@
 
         // 指定された軸位置のキューブレットを選択し、回転グループに追加する関数
         function selectCubeletsByPosition(xVal, yVal, zVal) {
+            // 回転開始時に、全てのキューブレットから枠線を削除
+            cubelets.forEach(cubelet => {
+                removeFaceBorders(cubelet);
+            });
+
             rotatingGroup = new THREE.Group(); // 新しい回転グループを初期化
 
             // 条件に合うキューブレットをフィルタリング
@@ -1122,7 +1212,7 @@
 
             isRotating = false; // 回転アニメーション終了
             updateButtonStates(); // ボタンの状態を更新
-            applyFrontFaceTransparency(); // 回転後に透明度を再適用
+            applyFaceDisplayMode(); // 回転後に描画モードを再適用
             
             // シャッフル中であれば次の操作を実行
             if (isShuffling && shuffleQueue.length > 0) {
@@ -1186,7 +1276,7 @@
 
         // --- アンドゥ機能 ---
         function undoLastMove() {
-            if (isRotating || isShuffling || isUndoing || isCameraAnimating) return; // 回転中やシャッフル中は無視
+            if (isRotating || isCameraAnimating || isShuffling || isUndoing) return; // 回転中やシャッフル中は無視
 
             if (moveHistory.length === 0) {
                 console.log("アンドゥできる操作がありません。");
@@ -1320,7 +1410,7 @@
                     isCameraAnimating = false;
                     console.log("カメラアニメーション完了。");
                     updateButtonStates(); // カメラアニメーション完了時にも更新
-                    applyFrontFaceTransparency(); // カメラアニメーション完了後に透明度を再適用
+                    applyFaceDisplayMode(); // カメラアニメーション完了後に描画モードを再適用
                 }
             }
 
@@ -1337,7 +1427,7 @@
             camera.updateProjectionMatrix(); // 投影行列を更新
 
             renderer.setSize(width, height); // レンダラーのサイズも更新
-            applyFrontFaceTransparency(); // リサイズ後にも透明度を再適用
+            applyFaceDisplayMode(); // リサイズ後にも描画モードを再適用
         });
 
         animate(); // アニメーションループを開始
@@ -1370,7 +1460,7 @@
 
             isCameraAnimating = true; // カメラアニメーションを開始
             updateButtonStates(); // カメラアニメーション開始時にも更新
-            applyFrontFaceTransparency(); // カメラアニメーション完了後に透明度を再適用
+            applyFaceDisplayMode(); // カメラアニメーション完了後に描画モードを再適用
         }
 
 
@@ -1423,12 +1513,16 @@
                     new THREE.Vector3(0, 0, -1)    // 5: Back (-Z)
                 ];
 
-                localFaceNormals.forEach((localNormal, materialIndex) => {
-                    const worldNormal = localNormal.clone();
+                // cubelet.materialが単一のマテリアルか、配列であるかに対応
+                const materialsToProcess = Array.isArray(cubelet.material) ? cubelet.material : [cubelet.material];
+
+                materialsToProcess.forEach((mat, materialIndex) => {
+                    const worldNormal = localFaceNormals[materialIndex].clone();
                     worldNormal.applyQuaternion(cubelet.quaternion); // ローカル法線にキューブレットの回転を適用し、ワールド法線に変換
 
-                    const colorCode = cubelet.material[materialIndex].color.getHex();
-                    const colorAlias = colorAliases[colorCode] || '?'; // 定義された色の略称、または不明な場合は'?'
+                    // オリジナルカラーがまだ保存されていなければ保存
+                    const originalColorCode = mat.originalColorHex !== undefined ? mat.originalColorHex : mat.color.getHex();
+                    const colorAlias = colorAliases[originalColorCode] || '?'; // 定義された色の略称、または不明な場合は'?'
 
                     let row, col;
 
@@ -1507,7 +1601,7 @@
             cameraViewButton.addEventListener('click', changeCameraView);
         }
         if (toggleTransparencyButton) { // 新しいボタンのイベントリスナーを設定
-            toggleTransparencyButton.addEventListener('click', toggleFrontFaceTransparency);
+            toggleTransparencyButton.addEventListener('click', toggleFaceDisplayMode);
         }
 
         // ボタンの活性/非活性を制御する関数
