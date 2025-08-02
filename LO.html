@@ -133,6 +133,11 @@
             transform: scale(0.98);
         }
 
+        .btn:disabled {
+            background-color: #4a5568;
+            cursor: not-allowed;
+        }
+
         .hidden {
             display: none;
         }
@@ -183,15 +188,16 @@
         const rows = 5;
         const cols = 5;
         let board = [];
-        let solution = []; // 正解の手順を保存する配列
+        let lightStates = []; // ライトの状態を数値で保持する
 
         // ゲームボードを初期化
         function initBoard() {
             board = [];
-            solution = []; // 新しいゲームのたびに正解をリセット
+            lightStates = [];
             boardElement.innerHTML = '';
             for (let i = 0; i < rows; i++) {
                 board[i] = [];
+                lightStates[i] = [];
                 for (let j = 0; j < cols; j++) {
                     const light = document.createElement('button');
                     light.classList.add('light');
@@ -200,6 +206,7 @@
                     light.addEventListener('click', () => handleLightClick(i, j));
                     boardElement.appendChild(light);
                     board[i][j] = light;
+                    lightStates[i][j] = 0; // 0: off, 1: on
                 }
             }
             createSolvablePuzzle();
@@ -208,8 +215,18 @@
         // ライトの状態を切り替える
         function toggleLight(r, c) {
             if (r >= 0 && r < rows && c >= 0 && c < cols) {
-                const light = board[r][c];
-                light.classList.toggle('on');
+                lightStates[r][c] = 1 - lightStates[r][c];
+                updateLightVisual(r, c);
+            }
+        }
+
+        // ライトの見た目を更新する
+        function updateLightVisual(r, c) {
+            const light = board[r][c];
+            if (lightStates[r][c] === 1) {
+                light.classList.add('on');
+            } else {
+                light.classList.remove('on');
             }
         }
 
@@ -226,8 +243,7 @@
 
         // 全てのライトが消灯しているかチェックする
         function checkWin() {
-            const allLights = document.querySelectorAll('.light');
-            const allOff = Array.from(allLights).every(light => !light.classList.contains('on'));
+            const allOff = lightStates.every(row => row.every(state => state === 0));
             if (allOff) {
                 showMessage('おめでとうございます！', 'win');
                 disableBoard();
@@ -259,22 +275,70 @@
             });
         }
 
-        // ランダムだが解けるパズルを作成する
+        // 解けるパズルを生成する
         function createSolvablePuzzle() {
-            // 解ける問題を作成するために、ランダムにクリック操作を行う
-            // 同じマスを2回クリックすることは無意味なので、各マスは1回だけクリックするかどうかをランダムに決める
+            // 初期状態を全て消灯にする
+            for (let i = 0; i < rows; i++) {
+                for (let j = 0; j < cols; j++) {
+                    lightStates[i][j] = 0;
+                    updateLightVisual(i, j);
+                }
+            }
+
+            // ランダムに盤面を操作して、解ける状態の初期盤面を作る
             for (let i = 0; i < rows; i++) {
                 for (let j = 0; j < cols; j++) {
                     if (Math.random() > 0.5) {
-                        // この操作を記録しておく
-                        solution.push({r: i, c: j});
                         handleLightClick(i, j);
                     }
                 }
             }
+            
             // ゲーム開始時はメッセージボックスを非表示に
             messageBox.classList.remove('show');
             enableBoard();
+        }
+        
+        // 現在の盤面から最短手順を計算する
+        function getSolution() {
+            const applySimulatedClick = (board, r, c) => {
+                if (r >= 0 && r < rows && c >= 0 && c < cols) board[r][c] = 1 - board[r][c];
+                if (r > 0) board[r - 1][c] = 1 - board[r - 1][c];
+                if (r < rows - 1) board[r + 1][c] = 1 - board[r + 1][c];
+                if (c > 0) board[r][c - 1] = 1 - board[r][c - 1];
+                if (c < cols - 1) board[r][c + 1] = 1 - board[r][c + 1];
+            };
+
+            const tempBoard = lightStates.map(row => [...row]);
+            const solution = [];
+            
+            for (let i = 0; i < (1 << cols); i++) {
+                let trialBoard = tempBoard.map(row => [...row]);
+                let clicks = [];
+
+                for (let j = 0; j < cols; j++) {
+                    if ((i >> j) & 1) {
+                        applySimulatedClick(trialBoard, 0, j);
+                        clicks.push({r: 0, c: j});
+                    }
+                }
+
+                for (let r = 0; r < rows - 1; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        if (trialBoard[r][c] === 1) {
+                            applySimulatedClick(trialBoard, r + 1, c);
+                            clicks.push({r: r + 1, c: c});
+                        }
+                    }
+                }
+
+                const isSolved = trialBoard.every(row => row.every(state => state === 0));
+                if (isSolved) {
+                    return clicks;
+                }
+            }
+
+            return [];
         }
 
         // 新しいゲームボタンのイベントリスナー
@@ -284,19 +348,28 @@
 
         // ヒントボタンのイベントリスナー
         hintBtn.addEventListener('click', () => {
-            if (solution.length > 0) {
-                const hint = solution.shift(); // 最初のヒントを取得
+            // ヒントボタンを無効化
+            hintBtn.disabled = true;
+
+            const solution = getSolution();
+            if (solution && solution.length > 0) {
+                const hint = solution[0];
                 const hintLight = board[hint.r][hint.c];
                 
-                // ヒントのライトを光らせて、クリックをシミュレート
+                // ヒントのライトを光らせる
                 hintLight.style.border = '2px solid #fff';
                 setTimeout(() => {
                     hintLight.style.border = 'none';
+                    // ヒントのライトを実際にクリックする
                     handleLightClick(hint.r, hint.c);
+                    // ヒントボタンを再度有効化
+                    hintBtn.disabled = false;
                 }, 500);
 
             } else {
                 showMessage('これ以上のヒントはありません。', 'info');
+                // ヒントボタンを再度有効化
+                hintBtn.disabled = false;
             }
         });
         
