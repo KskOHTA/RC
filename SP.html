@@ -7,6 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body, html {
+            /* ページ全体のスクロールを無効にする */
+            overflow: hidden;
+            height: 100vh;
+        }
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f0f4f8;
@@ -14,7 +19,6 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
             padding: 20px;
         }
         .puzzle-container {
@@ -264,27 +268,19 @@
             });
 
             puzzleContainer.addEventListener('touchstart', (e) => {
-                // スワイプ開始位置を保存
                 startX = e.touches[0].clientX;
                 startY = e.touches[0].clientY;
             });
             
             puzzleContainer.addEventListener('touchend', (e) => {
-                // スワイプ終了位置を取得
                 const endX = e.changedTouches[0].clientX;
                 const endY = e.changedTouches[0].clientY;
-                
-                // 距離を計算
                 const diffX = endX - startX;
                 const diffY = endY - startY;
-                
-                // スワイプの閾値
                 const swipeThreshold = 30;
 
-                // スワイプと認識されるか判定
                 if (Math.abs(diffX) > swipeThreshold || Math.abs(diffY) > swipeThreshold) {
                     if (Math.abs(diffX) > Math.abs(diffY)) {
-                        // 水平スワイプ
                         if (diffX > 0) { // 右スワイプ
                             if (emptyTilePos.col > 0) {
                                 moveTile(board[emptyTilePos.row][emptyTilePos.col - 1]);
@@ -295,7 +291,6 @@
                             }
                         }
                     } else {
-                        // 垂直スワイプ
                         if (diffY > 0) { // 下スワイプ
                             if (emptyTilePos.row > 0) {
                                 moveTile(board[emptyTilePos.row - 1][emptyTilePos.col]);
