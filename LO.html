@@ -166,6 +166,7 @@
         <div class="board" id="board"></div>
         <div class="controls">
             <button id="new-game-btn" class="btn">新しいゲーム</button>
+            <button id="hint-btn" class="btn">ヒント</button>
         </div>
         <div id="message-box" class="message-box">
             <h3 id="message"></h3>
@@ -175,16 +176,19 @@
     <script>
         const boardElement = document.getElementById('board');
         const newGameBtn = document.getElementById('new-game-btn');
+        const hintBtn = document.getElementById('hint-btn');
         const messageBox = document.getElementById('message-box');
         const messageElement = document.getElementById('message');
 
         const rows = 5;
         const cols = 5;
         let board = [];
+        let solution = []; // 正解の手順を保存する配列
 
         // ゲームボードを初期化
         function initBoard() {
             board = [];
+            solution = []; // 新しいゲームのたびに正解をリセット
             boardElement.innerHTML = '';
             for (let i = 0; i < rows; i++) {
                 board[i] = [];
@@ -262,6 +266,8 @@
             for (let i = 0; i < rows; i++) {
                 for (let j = 0; j < cols; j++) {
                     if (Math.random() > 0.5) {
+                        // この操作を記録しておく
+                        solution.push({r: i, c: j});
                         handleLightClick(i, j);
                     }
                 }
@@ -274,6 +280,24 @@
         // 新しいゲームボタンのイベントリスナー
         newGameBtn.addEventListener('click', () => {
             initBoard();
+        });
+
+        // ヒントボタンのイベントリスナー
+        hintBtn.addEventListener('click', () => {
+            if (solution.length > 0) {
+                const hint = solution.shift(); // 最初のヒントを取得
+                const hintLight = board[hint.r][hint.c];
+                
+                // ヒントのライトを光らせて、クリックをシミュレート
+                hintLight.style.border = '2px solid #fff';
+                setTimeout(() => {
+                    hintLight.style.border = 'none';
+                    handleLightClick(hint.r, hint.c);
+                }, 500);
+
+            } else {
+                showMessage('これ以上のヒントはありません。', 'info');
+            }
         });
         
         // ページ読み込み時にゲームを開始
