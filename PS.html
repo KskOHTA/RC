@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peg Solitaire</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            flex-direction: column;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            background-color: #fff;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            max-width: 90%;
+            width: 500px;
+        }
+
+        h1 {
+            color: #4b5563;
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+
+        #game-board-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            width: 100%;
+            aspect-ratio: 1;
+            background-color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+            transition: transform 0.5s ease-in-out;
+            --rotation: 0deg; /* CSS変数を定義 */
+            transform: rotate(var(--rotation)); /* CSS変数を使用 */
+        }
+
+        .hole {
+            width: 100%;
+            aspect-ratio: 1;
+            background-color: #cbd5e1;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.2s ease-in-out;
+            position: relative;
+        }
+
+        .peg {
+            width: 80%;
+            height: 80%;
+            background-color: #3b82f6;
+            border-radius: 50%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+            cursor: pointer;
+            transition: transform 0.2s ease-in-out;
+            /* ボードの回転と反対方向に回転させて、常に正面を向かせる */
+            transform: rotate(calc(-1 * var(--rotation)));
+        }
+
+        .peg:hover {
+            transform: scale(1.1) rotate(calc(-1 * var(--rotation)));
+        }
+
+        .selected {
+            background-color: #10b981;
+            box-shadow: 0 0 0 4px #10b981;
+            animation: pulse 1s infinite;
+        }
+
+        .highlight {
+            background-color: #f59e0b;
+            cursor: pointer;
+        }
+
+        .highlight:hover {
+            transform: scale(1.1);
+        }
+
+        .message-box {
+            margin-top: 1.5rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #4b5563;
+            text-align: center;
+            min-height: 2rem;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .button-reset {
+            background-color: #ef4444;
+            color: #fff;
+        }
+        
+        .button-rotate {
+            background-color: #3b82f6;
+            color: #fff;
+        }
+
+        .button-reset:hover {
+            background-color: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        .button-rotate:hover {
+            background-color: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        /* 盤面の形状調整 */
+        .hole.hidden {
+            visibility: hidden;
+        }
+
+        .row-0 .col-0, .row-0 .col-1, .row-0 .col-5, .row-0 .col-6,
+        .row-1 .col-0, .row-1 .col-1, .row-1 .col-5, .row-1 .col-6,
+        .row-5 .col-0, .row-5 .col-1, .row-5 .col-5, .row-5 .col-6,
+        .row-6 .col-0, .row-6 .col-1, .row-6 .col-5, .row-6 .col-6 {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Peg Solitaire</h1>
+        <div id="game-board-container">
+            <div id="game-board"></div>
+        </div>
+        <div id="message-box" class="message-box"></div>
+        <div class="button-group">
+            <button id="reset-button" class="button button-reset">リセット</button>
+            <button id="rotate-cw-button" class="button button-rotate">時計回り</button>
+            <button id="rotate-ccw-button" class="button button-rotate">反時計回り</button>
+        </div>
+    </div>
+
+    <script>
+        const board = document.getElementById('game-board');
+        const messageBox = document.getElementById('message-box');
+        const resetButton = document.getElementById('reset-button');
+        const rotateCWButton = document.getElementById('rotate-cw-button');
+        const rotateCCWButton = document.getElementById('rotate-ccw-button');
+        
+        let gameState = [];
+        let selectedPeg = null;
+        let rotationState = 0; // 現在の回転角度（度数）
+        let isRotating = false; // 回転アニメーション中かどうかを判定するフラグ
+        let touchStartElement = null; // タッチ開始時の要素を保持
+        let touchStartCoordinates = {}; // タッチ開始時の座標を保持
+
+        // ボードの初期状態を定義
+        const initialBoard = [
+            [null, null, 1, 1, 1, null, null],
+            [null, null, 1, 1, 1, null, null],
+            [1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 0, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1],
+            [null, null, 1, 1, 1, null, null],
+            [null, null, 1, 1, 1, null, null]
+        ];
+
+        /**
+         * ゲームボードを初期化し、HTMLにレンダリングします。
+         */
+        function initializeBoard() {
+            gameState = JSON.parse(JSON.stringify(initialBoard)); // ディープコピー
+            gameState[3][3] = 0; // 中央のペグを空にする
+            board.innerHTML = '';
+            selectedPeg = null;
+            rotationState = 0;
+            board.style.setProperty('--rotation', `0deg`); // 回転をリセット
+            isRotating = false;
+            renderBoard();
+            updateMessage();
+            
+            // 現在のホールの座標をコンソールに表示
+            logBoardState("初期化");
+        }
+
+        /**
+         * 現在のゲームの状態に基づいてボードをレンダリングします。
+         */
+        function renderBoard() {
+            board.innerHTML = '';
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('hole');
+                    // 行と列のデータ属性を追加
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    
+                    if (gameState[r][c] === null) {
+                        cell.classList.add('hidden');
+                    } else if (gameState[r][c] === 1) {
+                        const peg = document.createElement('div');
+                        peg.classList.add('peg');
+                        cell.appendChild(peg);
+                    }
+                    board.appendChild(cell);
+                }
+            }
+            addEventListeners();
+        }
+
+        /**
+         * クリックおよびタッチイベントリスナーをボードの穴とペグに追加します。
+         */
+        function addEventListeners() {
+            const holes = document.querySelectorAll('.hole');
+            holes.forEach(hole => {
+                hole.addEventListener('click', handleBoardClick);
+                hole.addEventListener('touchstart', handleTouchStart);
+                hole.addEventListener('touchend', handleTouchEnd);
+            });
+        }
+
+        /**
+         * ボード上の穴がクリックされたときの処理です。
+         * マウス操作のメインロジック。
+         * @param {MouseEvent} e - クリックイベント
+         */
+        function handleBoardClick(e) {
+            // 回転中は操作を無効化
+            if (isRotating) return;
+
+            const hole = e.target.closest('.hole');
+            if (!hole) return;
+
+            const row = parseInt(hole.dataset.row);
+            const col = parseInt(hole.dataset.col);
+
+            // ペグをクリックした場合
+            if (gameState[row][col] === 1) {
+                handlePegClick(hole);
+            } 
+            // 空の穴をクリックした場合
+            else if (gameState[row][col] === 0) {
+                handleEmptyHoleClick(hole);
+            }
+        }
+
+        /**
+         * ペグがクリックされたときの処理です。
+         * 選択されたペグをハイライトし、有効な移動先を強調表示します。
+         * @param {HTMLElement} hole - クリックされたペグが入っている穴の要素
+         */
+        function handlePegClick(hole) {
+            clearHighlights();
+            const row = parseInt(hole.dataset.row);
+            const col = parseInt(hole.dataset.col);
+
+            // 既に選択済みのペグを再クリックした場合、選択を解除
+            if (selectedPeg && selectedPeg.row === row && selectedPeg.col === col) {
+                selectedPeg = null;
+            } else {
+                selectedPeg = { row, col };
+                hole.querySelector('.peg').classList.add('selected');
+                highlightValidMoves(row, col);
+            }
+        }
+
+        /**
+         * 空の穴がクリックされたときの処理です。
+         * 有効な移動であれば、移動を実行します。
+         * @param {HTMLElement} hole - クリックされた空の穴の要素
+         */
+        function handleEmptyHoleClick(hole) {
+            if (!selectedPeg) {
+                updateMessage("移動するペグを選択してください。", true);
+                return;
+            }
+
+            const targetRow = parseInt(hole.dataset.row);
+            const targetCol = parseInt(hole.dataset.col);
+            const { row: startRow, col: startCol } = selectedPeg;
+
+            if (isValidMove(startRow, startCol, targetRow, targetCol)) {
+                makeMove(startRow, startCol, targetRow, targetCol);
+                checkWinCondition();
+                logBoardState("ペグ移動"); // ペグ移動後にログを出力
+            } else {
+                updateMessage("無効な移動です。ペグは隣接するペグを飛び越えて空の穴に移動できます。", true);
+            }
+        }
+
+        /**
+         * タッチ開始時の処理です。
+         * 座標とタッチ開始時の要素を記録します。
+         * @param {TouchEvent} e - タッチイベント
+         */
+        function handleTouchStart(e) {
+            e.preventDefault();
+            // 回転中は操作を無効化
+            if (isRotating) return;
+            touchStartElement = e.target.closest('.hole');
+            touchStartCoordinates = {
+                x: e.touches[0].clientX,
+                y: e.touches[0].clientY
+            };
+        }
+
+        /**
+         * タッチ終了時の処理です。
+         * タップとスワイプを区別して処理します。
+         * @param {TouchEvent} e - タッチイベント
+         */
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            // 回転中は操作を無効化
+            if (isRotating) return;
+
+            const touchEndElement = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY).closest('.hole');
+            
+            if (!touchStartElement || !touchEndElement) {
+                clearHighlights();
+                selectedPeg = null;
+                return;
+            }
+
+            const touchEndCoordinates = {
+                x: e.changedTouches[0].clientX,
+                y: e.changedTouches[0].clientY
+            };
+            const dx = Math.abs(touchEndCoordinates.x - touchStartCoordinates.x);
+            const dy = Math.abs(touchEndCoordinates.y - touchStartCoordinates.y);
+            const threshold = 15; // タップとスワイプを区別する閾値 (少し大きめに設定)
+
+            // タップと見なす場合
+            if (dx < threshold && dy < threshold) {
+                const row = parseInt(touchEndElement.dataset.row);
+                const col = parseInt(touchEndElement.dataset.col);
+                if (gameState[row][col] === 1) {
+                    handlePegClick(touchEndElement);
+                } else if (gameState[row][col] === 0) {
+                    handleEmptyHoleClick(touchEndElement);
+                }
+            } 
+            // スワイプと見なす場合
+            else {
+                const startRow = parseInt(touchStartElement.dataset.row);
+                const startCol = parseInt(touchStartElement.dataset.col);
+                const targetRow = parseInt(touchEndElement.dataset.row);
+                const targetCol = parseInt(touchEndElement.dataset.col);
+
+                // スワイプの場合は、開始時にペグが選択されていると仮定し、直接移動を試みる
+                selectedPeg = { row: startRow, col: startCol };
+
+                if (isValidMove(startRow, startCol, targetRow, targetCol)) {
+                    makeMove(startRow, startCol, targetRow, targetCol);
+                    checkWinCondition();
+                    logBoardState("ペグ移動 (スワイプ)"); // スワイプ後のログを出力
+                } else {
+                    updateMessage("無効なスワイプです。ペグから空の穴へ移動してください。", true);
+                    clearHighlights();
+                    selectedPeg = null;
+                }
+            }
+        }
+
+
+        /**
+         * 選択されたペグの有効な移動先をハイライト表示します。
+         * @param {number} row - ペグの行
+         * @param {number} col - ペグの列
+         */
+        function highlightValidMoves(row, col) {
+            const possibleMoves = [
+                { dr: 2, dc: 0 }, { dr: -2, dc: 0 },
+                { dr: 0, dc: 2 }, { dr: 0, dc: -2 }
+            ];
+
+            possibleMoves.forEach(({ dr, dc }) => {
+                const targetRow = row + dr;
+                const targetCol = col + dc;
+
+                if (isValidMove(row, col, targetRow, targetCol)) {
+                    const targetHole = document.querySelector(`[data-row="${targetRow}"][data-col="${targetCol}"]`);
+                    if (targetHole) {
+                        targetHole.classList.add('highlight');
+                    }
+                }
+            });
+        }
+
+        /**
+         * 盤面からすべてのハイライトを削除します。
+         */
+        function clearHighlights() {
+            document.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
+            document.querySelectorAll('.highlight').forEach(el => el.classList.remove('highlight'));
+        }
+
+        /**
+         * 指定された移動が有効かどうかをチェックします。
+         * @param {number} startRow - 開始行
+         * @param {number} startCol - 開始列
+         * @param {number} targetRow - ターゲット行
+         * @param {number} targetCol - ターゲット列
+         * @returns {boolean} - 有効な移動であれば true
+         */
+        function isValidMove(startRow, startCol, targetRow, targetCol) {
+            // 盤面の範囲外ではないかチェック
+            if (targetRow < 0 || targetRow >= 7 || targetCol < 0 || targetCol >= 7) {
+                return false;
+            }
+            // 盤面の無効な部分ではないかチェック
+            if (gameState[targetRow][targetCol] === null) {
+                return false;
+            }
+            // 開始位置にペグがあり、ターゲットが空であること
+            if (gameState[startRow][startCol] !== 1 || gameState[targetRow][targetCol] !== 0) {
+                return false;
+            }
+
+            const jumpRow = startRow + (targetRow - startRow) / 2;
+            const jumpCol = startCol + (targetCol - startCol) / 2;
+
+            // 飛び越える場所にペグがあること
+            if (gameState[jumpRow][jumpCol] !== 1) {
+                return false;
+            }
+
+            // 移動距離が正しいこと
+            const dx = Math.abs(startCol - targetCol);
+            const dy = Math.abs(startRow - targetRow);
+            return (dx === 2 && dy === 0) || (dx === 0 && dy === 2);
+        }
+
+        /**
+         * ゲームの状態を変更して移動を実行します。
+         * @param {number} startRow - 開始行
+         * @param {number} startCol - 開始列
+         * @param {number} targetRow - ターゲット行
+         * @param {number} targetCol - ターゲット列
+         */
+        function makeMove(startRow, startCol, targetRow, targetCol) {
+            const jumpRow = startRow + (targetRow - startRow) / 2;
+            const jumpCol = startCol + (targetCol - startCol) / 2;
+
+            gameState[startRow][startCol] = 0;
+            gameState[jumpRow][jumpCol] = 0;
+            gameState[targetRow][targetCol] = 1;
+
+            selectedPeg = null;
+            renderBoard();
+            updateMessage();
+        }
+
+        /**
+         * 勝利条件とゲームオーバー条件をチェックします。
+         */
+        function checkWinCondition() {
+            let pegCount = 0;
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (gameState[r][c] === 1) {
+                        pegCount++;
+                    }
+                }
+            }
+
+            if (pegCount === 1) {
+                updateMessage("おめでとうございます！クリアです！", false, true);
+                return;
+            }
+
+            if (!hasValidMoves()) {
+                updateMessage(`ゲームオーバーです。残ったペグは${pegCount}個です。`, false, true);
+            }
+        }
+
+        /**
+         * 有効な移動が残っているかをチェックします。
+         * @returns {boolean} - 有効な移動が残っていれば true
+         */
+        function hasValidMoves() {
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    if (gameState[r][c] === 1) {
+                        // 上下左右に2マス移動できるかチェック
+                        if (isValidMove(r, c, r + 2, c) || isValidMove(r, c, r - 2, c) ||
+                            isValidMove(r, c, r, c + 2) || isValidMove(r, c, r, c - 2)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        /**
+         * メッセージボックスを更新します。
+         * @param {string} msg - 表示するメッセージ (省略可能)
+         * @param {boolean} isError - エラーメッセージかどうか
+         * @param {boolean} isFinal - ゲームの終了メッセージかどうか
+         */
+        function updateMessage(msg = "", isError = false, isFinal = false) {
+            clearHighlights();
+            if (isError) {
+                messageBox.style.color = "#dc2626";
+                messageBox.textContent = msg;
+            } else if (isFinal) {
+                messageBox.style.color = "#10b981";
+                messageBox.textContent = msg;
+            } else {
+                messageBox.style.color = "#4b5563";
+                let pegCount = 0;
+                for (let r = 0; r < 7; r++) {
+                    for (let c = 0; c < 7; c++) {
+                        if (gameState[r][c] === 1) {
+                            pegCount++;
+                        }
+                    }
+                }
+                messageBox.textContent = `現在のペグ数: ${pegCount}`;
+            }
+        }
+
+        /**
+         * 現在のボードの状態（ホールとペグの座標）をコンソールにログ出力します。
+         * @param {string} action - ログを出力するきっかけとなったアクション
+         */
+        function logBoardState(action) {
+            console.log("--------------------");
+            console.log(`ボードの状態ログ: ${action}`);
+
+            // ホール（穴）の座標のみをログ出力
+            console.log("ホールの座標:");
+            for (let r = 0; r < 7; r++) {
+                for (let c = 0; c < 7; c++) {
+                    // 表示されている穴（gameStateが0）のみを対象とする
+                    if (gameState[r][c] === 0) {
+                        console.log(`(row: ${r}, col: ${c})`);
+                    }
+                }
+            }
+            console.log("--------------------");
+        }
+        
+        /**
+         * 盤面を回転させます。
+         * @param {boolean} isClockwise - trueで時計回り、falseで反時計回り
+         */
+        function rotateBoard(isClockwise) {
+            if (isRotating) return;
+            isRotating = true;
+
+            const previousRotationState = rotationState;
+
+            if (isClockwise) {
+                rotationState += 90;
+                console.log("時計回りに90度回転しました。次の回転角度: " + rotationState + "度");
+            } else {
+                rotationState -= 90;
+                console.log("反時計回りに90度回転しました。次の回転角度: " + rotationState + "度");
+            }
+
+            // CSS変数を更新して回転を適用
+            board.style.setProperty('--rotation', `${rotationState}deg`);
+            
+            // アニメーションが終了した後の処理
+            const transitionEndHandler = () => {
+                board.removeEventListener('transitionend', transitionEndHandler);
+                isRotating = false;
+                updateMessage();
+                
+                // 回転後のボードの状態をコンソールに表示 (見た目のみの回転なので、座標は変わらない)
+                console.log("アニメーション完了。最終的な回転角度: " + rotationState + "度");
+                logBoardState("ボード回転 (見た目のみ)");
+            };
+
+            board.addEventListener('transitionend', transitionEndHandler);
+        }
+
+        resetButton.addEventListener('click', initializeBoard);
+        rotateCWButton.addEventListener('click', () => rotateBoard(true));
+        rotateCCWButton.addEventListener('click', () => rotateBoard(false));
+
+        // ゲームの開始
+        initializeBoard();
+    </script>
+</body>
+</html>
