@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>15スライドパズル</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8;
+            color: #334155;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .puzzle-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            grid-template-rows: repeat(4, 1fr);
+            gap: 8px;
+            width: 100%;
+            max-width: 450px;
+            aspect-ratio: 1 / 1;
+            padding: 8px;
+            background-color: #cbd5e1;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1), 0 6px 6px rgba(0, 0, 0, 0.08);
+            position: relative;
+            user-select: none;
+        }
+        .tile, .empty-tile {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 2rem;
+            font-weight: 700;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            user-select: none;
+        }
+        .tile {
+            background-color: #4f46e5;
+            color: #ffffff;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
+            z-index: 10;
+        }
+        .tile:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15), 0 3px 5px rgba(0, 0, 0, 0.12);
+        }
+        .empty-tile {
+            background-color: transparent;
+            cursor: default;
+        }
+        .empty-tile:hover {
+            transform: none;
+            box-shadow: none;
+        }
+        .button {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background-color: #10b981;
+            color: #ffffff;
+            border-radius: 0.75rem;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .button:hover {
+            background-color: #059669;
+            transform: translateY(-2px);
+        }
+        .message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #334155;
+            color: #ffffff;
+            padding: 30px;
+            border-radius: 1rem;
+            box-shadow: 0 20px 25px rgba(0, 0, 0, 0.25);
+            z-index: 100;
+            text-align: center;
+            display: none; /* Initially hidden */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="flex flex-col items-center space-y-8 p-4">
+        <h1 class="text-4xl font-bold">15スライドパズル</h1>
+        
+        <div class="puzzle-container" id="puzzle-container"></div>
+        
+        <button id="reset-button" class="button">リセット</button>
+
+        <div class="message-box" id="message-box">
+            <h2 class="text-3xl font-bold mb-4">パズルクリア！</h2>
+            <button id="close-message" class="button bg-indigo-600 hover:bg-indigo-700">閉じる</button>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const puzzleContainer = document.getElementById('puzzle-container');
+            const resetButton = document.getElementById('reset-button');
+            const messageBox = document.getElementById('message-box');
+            const closeMessageButton = document.getElementById('close-message');
+            
+            let board = [];
+            let emptyTilePos = { row: 3, col: 3 };
+            let tileElements = {};
+            let startX, startY;
+
+            function isSolvable(tiles) {
+                let inversions = 0;
+                for (let i = 0; i < 15; i++) {
+                    for (let j = i + 1; j < 15; j++) {
+                        if (tiles[i] && tiles[j] && tiles[i] > tiles[j]) {
+                            inversions++;
+                        }
+                    }
+                }
+                const emptyRowFromBottom = 4 - Math.floor(tiles.indexOf(0) / 4);
+                return (inversions % 2 === 0) === (emptyRowFromBottom % 2 !== 0);
+            }
+
+            function initBoard() {
+                let tiles = Array.from({ length: 16 }, (_, i) => i);
+                
+                do {
+                    for (let i = tiles.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [tiles[i], tiles[j]] = [tiles[j], tiles[i]];
+                    }
+                } while (!isSolvable(tiles));
+                
+                board = [];
+                tileElements = {};
+                puzzleContainer.innerHTML = '';
+                
+                let k = 0;
+                for (let i = 0; i < 4; i++) {
+                    board[i] = [];
+                    for (let j = 0; j < 4; j++) {
+                        const tileValue = tiles[k];
+                        board[i][j] = tileValue;
+                        if (tileValue === 0) {
+                            emptyTilePos = { row: i, col: j };
+                        }
+
+                        const tileDiv = document.createElement('div');
+                        if (tileValue === 0) {
+                            tileDiv.className = 'empty-tile';
+                        } else {
+                            tileDiv.className = 'tile';
+                            tileDiv.textContent = tileValue;
+                            tileDiv.dataset.value = tileValue;
+                            tileDiv.addEventListener('click', () => {
+                                moveTile(tileValue);
+                            });
+                        }
+                        tileDiv.style.order = k;
+                        puzzleContainer.appendChild(tileDiv);
+                        tileElements[tileValue] = tileDiv;
+                        k++;
+                    }
+                }
+            }
+
+            function moveTile(tileValue) {
+                let tilePos = null;
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        if (board[i][j] === tileValue) {
+                            tilePos = { row: i, col: j };
+                            break;
+                        }
+                    }
+                    if (tilePos) break;
+                }
+
+                const isAdjacent = (
+                    (Math.abs(tilePos.row - emptyTilePos.row) === 1 && tilePos.col === emptyTilePos.col) ||
+                    (Math.abs(tilePos.col - emptyTilePos.col) === 1 && tilePos.row === emptyTilePos.row)
+                );
+                
+                if (isAdjacent) {
+                    const tileEl = tileElements[tileValue];
+                    const emptyEl = tileElements[0];
+
+                    const tileOrder = parseInt(tileEl.style.order, 10);
+                    const emptyOrder = parseInt(emptyEl.style.order, 10);
+                    
+                    tileEl.style.order = emptyOrder;
+                    emptyEl.style.order = tileOrder;
+                    
+                    [board[tilePos.row][tilePos.col], board[emptyTilePos.row][emptyTilePos.col]] =
+                    [board[emptyTilePos.row][emptyTilePos.col], board[tilePos.row][tilePos.col]];
+                    
+                    emptyTilePos = tilePos;
+                    checkWin();
+                }
+            }
+
+            function checkWin() {
+                let correct = true;
+                let k = 1;
+                for (let i = 0; i < 4; i++) {
+                    for (let j = 0; j < 4; j++) {
+                        if (i === 3 && j === 3) {
+                            if (board[i][j] !== 0) {
+                                correct = false;
+                                break;
+                            }
+                        } else {
+                            if (board[i][j] !== k) {
+                                correct = false;
+                                break;
+                            }
+                            k++;
+                        }
+                    }
+                    if (!correct) break;
+                }
+                
+                if (correct) {
+                    messageBox.style.display = 'block';
+                }
+            }
+            
+            document.addEventListener('keydown', (e) => {
+                let tileToMoveValue = null;
+                switch(e.key) {
+                    case 'ArrowUp':
+                        if (emptyTilePos.row < 3) {
+                            tileToMoveValue = board[emptyTilePos.row + 1][emptyTilePos.col];
+                        }
+                        break;
+                    case 'ArrowDown':
+                        if (emptyTilePos.row > 0) {
+                            tileToMoveValue = board[emptyTilePos.row - 1][emptyTilePos.col];
+                        }
+                        break;
+                    case 'ArrowLeft':
+                        if (emptyTilePos.col < 3) {
+                            tileToMoveValue = board[emptyTilePos.row][emptyTilePos.col + 1];
+                        }
+                        break;
+                    case 'ArrowRight':
+                        if (emptyTilePos.col > 0) {
+                            tileToMoveValue = board[emptyTilePos.row][emptyTilePos.col - 1];
+                        }
+                        break;
+                }
+                if (tileToMoveValue !== null) {
+                    moveTile(tileToMoveValue);
+                }
+            });
+
+            puzzleContainer.addEventListener('touchstart', (e) => {
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+            });
+            
+            puzzleContainer.addEventListener('touchend', (e) => {
+                const endX = e.changedTouches[0].clientX;
+                const endY = e.changedTouches[0].clientY;
+                const diffX = endX - startX;
+                const diffY = endY - startY;
+
+                if (Math.abs(diffX) > Math.abs(diffY)) {
+                    if (diffX > 0) { // 右スワイプ
+                        if (emptyTilePos.col > 0) {
+                            moveTile(board[emptyTilePos.row][emptyTilePos.col - 1]);
+                        }
+                    } else { // 左スワイプ
+                        if (emptyTilePos.col < 3) {
+                            moveTile(board[emptyTilePos.row][emptyTilePos.col + 1]);
+                        }
+                    }
+                } else {
+                    if (diffY > 0) { // 下スワイプ
+                        if (emptyTilePos.row > 0) {
+                            moveTile(board[emptyTilePos.row - 1][emptyTilePos.col]);
+                        }
+                    } else { // 上スワイプ
+                        if (emptyTilePos.row < 3) {
+                            moveTile(board[emptyTilePos.row + 1][emptyTilePos.col]);
+                        }
+                    }
+                }
+            });
+
+            resetButton.addEventListener('click', () => {
+                initBoard();
+                messageBox.style.display = 'none';
+            });
+            closeMessageButton.addEventListener('click', () => {
+                messageBox.style.display = 'none';
+            });
+
+            initBoard();
+        });
+    </script>
+</body>
+</html>
