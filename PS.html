@@ -117,6 +117,8 @@
             display: flex;
             gap: 1rem;
             margin-top: 2rem;
+            flex-wrap: wrap; /* ボタンが多すぎる場合に折り返す */
+            justify-content: center;
         }
 
         .button {
@@ -130,6 +132,13 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
+        .button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         .button-reset {
             background-color: #ef4444;
             color: #fff;
@@ -140,13 +149,23 @@
             color: #fff;
         }
 
-        .button-reset:hover {
+        .button-undo {
+            background-color: #6b7280;
+            color: #fff;
+        }
+
+        .button-reset:hover:not(:disabled) {
             background-color: #dc2626;
             transform: translateY(-2px);
         }
 
-        .button-rotate:hover {
+        .button-rotate:hover:not(:disabled) {
             background-color: #2563eb;
+            transform: translateY(-2px);
+        }
+
+        .button-undo:hover:not(:disabled) {
+            background-color: #4b5563;
             transform: translateY(-2px);
         }
 
@@ -178,6 +197,7 @@
         <div id="message-box" class="message-box"></div>
         <div class="button-group">
             <button id="reset-button" class="button button-reset">リセット</button>
+            <button id="undo-button" class="button button-undo">元に戻す</button>
             <button id="rotate-cw-button" class="button button-rotate">時計回り</button>
             <button id="rotate-ccw-button" class="button button-rotate">反時計回り</button>
         </div>
@@ -187,6 +207,7 @@
         const board = document.getElementById('game-board');
         const messageBox = document.getElementById('message-box');
         const resetButton = document.getElementById('reset-button');
+        const undoButton = document.getElementById('undo-button'); // Undoボタンの要素を追加
         const rotateCWButton = document.getElementById('rotate-cw-button');
         const rotateCCWButton = document.getElementById('rotate-ccw-button');
         
@@ -196,6 +217,7 @@
         let isRotating = false; // 回転アニメーション中かどうかを判定するフラグ
         let touchStartElement = null; // タッチ開始時の要素を保持
         let touchStartCoordinates = {}; // タッチ開始時の座標を保持
+        let history = []; // ゲームの状態履歴を保存する配列
 
         // ボードの初期状態を定義
         const initialBoard = [
@@ -219,8 +241,13 @@
             rotationState = 0;
             board.style.setProperty('--rotation', `0deg`); // 回転をリセット
             isRotating = false;
+            
+            history = []; // 履歴をクリア
+            saveState(); // 初期状態を履歴に保存
+            
             renderBoard();
             updateMessage();
+            updateUndoButtonState(); // Undoボタンの状態を更新
             
             // 現在のホールの座標をコンソールに表示
             logBoardState("初期化");
@@ -484,6 +511,8 @@
          * @param {number} targetCol - ターゲット列
          */
         function makeMove(startRow, startCol, targetRow, targetCol) {
+            saveState(); // 移動前に現在の状態を履歴に保存
+
             const jumpRow = startRow + (targetRow - startRow) / 2;
             const jumpCol = startCol + (targetCol - startCol) / 2;
 
@@ -494,6 +523,41 @@
             selectedPeg = null;
             renderBoard();
             updateMessage();
+            updateUndoButtonState(); // Undoボタンの状態を更新
+        }
+
+        /**
+         * 現在のゲーム状態を履歴に保存します。
+         */
+        function saveState() {
+            history.push(JSON.parse(JSON.stringify(gameState))); // ディープコピーを保存
+            // 履歴のサイズを制限する場合（例：最後の10手まで）
+            // if (history.length > 10) {
+            //     history.shift(); // 最も古い状態を削除
+            // }
+        }
+
+        /**
+         * 履歴から前のゲーム状態に戻します。
+         */
+        function undoMove() {
+            if (history.length > 1) { // 初期状態より前の状態がある場合のみ
+                history.pop(); // 現在の状態を破棄
+                gameState = JSON.parse(JSON.stringify(history[history.length - 1])); // 前の状態に戻す
+                renderBoard();
+                updateMessage("元に戻しました。");
+                updateUndoButtonState(); // Undoボタンの状態を更新
+                logBoardState("元に戻す"); // Undo後のログを出力
+            } else {
+                updateMessage("これ以上元に戻せません。", true);
+            }
+        }
+
+        /**
+         * Undoボタンの有効/無効状態を更新します。
+         */
+        function updateUndoButtonState() {
+            undoButton.disabled = history.length <= 1; // 履歴が初期状態のみの場合は無効にする
         }
 
         /**
@@ -623,6 +687,7 @@
         }
 
         resetButton.addEventListener('click', initializeBoard);
+        undoButton.addEventListener('click', undoMove); // Undoボタンのイベントリスナーを追加
         rotateCWButton.addEventListener('click', () => rotateBoard(true));
         rotateCCWButton.addEventListener('click', () => rotateBoard(false));
 
