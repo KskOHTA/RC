@@ -117,7 +117,7 @@
             display: flex;
             gap: 1rem;
             margin-top: 2rem;
-            flex-wrap: wrap; /* ボタンが多すぎる場合に折り返す */
+            /* flex-wrap: wrap;  ボタンが多すぎる場合に折り返す */
             justify-content: center;
         }
 
@@ -130,6 +130,7 @@
             cursor: pointer;
             transition: background-color 0.3s, transform 0.2s;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            white-space: nowrap; /* ボタン内のテキストが折り返さないようにする */
         }
 
         .button:disabled {
