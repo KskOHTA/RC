@@ -25,7 +25,7 @@
             background-color: #fff;
             border-radius: 1rem;
             box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            max-width: 90%;
+            max-width: 90%; /* コンテナの最大幅を調整 */
             width: 500px;
         }
 
@@ -115,22 +115,25 @@
 
         .button-group {
             display: flex;
-            gap: 1rem;
+            gap: 0.8rem; /* ボタン間の間隔を少し狭くする */
             margin-top: 2rem;
-            /* flex-wrap: wrap;  ボタンが多すぎる場合に折り返す */
             justify-content: center;
+            width: 100%; /* ボタングループがコンテナの幅いっぱいに広がるように */
+            padding: 0 1rem; /* 左右に少しパディングを追加して端に寄りすぎないように */
+            box-sizing: border-box; /* パディングを含めて幅を計算 */
         }
 
         .button {
-            padding: 0.75rem 1.5rem;
+            padding: 0.6rem 1.2rem; /* パディングを小さくする */
             border: none;
             border-radius: 0.5rem;
-            font-size: 0.9rem;
+            font-size: 0.8rem; /* フォントサイズを小さくする */
             font-weight: 600;
             cursor: pointer;
             transition: background-color 0.3s, transform 0.2s;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             white-space: nowrap; /* ボタン内のテキストが折り返さないようにする */
+            flex-shrink: 0; /* ボタンが縮小されないようにする */
         }
 
         .button:disabled {
@@ -186,6 +189,17 @@
         .row-5 .col-0, .row-5 .col-1, .row-5 .col-5, .row-5 .col-6,
         .row-6 .col-0, .row-6 .col-1, .row-6 .col-5, .row-6 .col-6 {
             display: none;
+        }
+
+        /* 小さい画面での調整 */
+        @media (max-width: 400px) {
+            .button {
+                padding: 0.5rem 1rem; /* さらにパディングを小さく */
+                font-size: 0.75rem; /* さらにフォントサイズを小さく */
+            }
+            .button-group {
+                gap: 0.5rem; /* 間隔をさらに狭く */
+            }
         }
     </style>
 </head>
