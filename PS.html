@@ -223,7 +223,7 @@
         const board = document.getElementById('game-board');
         const messageBox = document.getElementById('message-box');
         const resetButton = document.getElementById('reset-button');
-        const undoButton = document.getElementById('undo-button'); // Undoボタンの要素を追加
+        const undoButton = document.getElementById('undo-button');
         const rotateCWButton = document.getElementById('rotate-cw-button');
         const rotateCCWButton = document.getElementById('rotate-ccw-button');
         
@@ -527,14 +527,15 @@
          * @param {number} targetCol - ターゲット列
          */
         function makeMove(startRow, startCol, targetRow, targetCol) {
-            saveState(); // 移動前に現在の状態を履歴に保存
-
             const jumpRow = startRow + (targetRow - startRow) / 2;
             const jumpCol = startCol + (targetCol - startCol) / 2;
 
             gameState[startRow][startCol] = 0;
             gameState[jumpRow][jumpCol] = 0;
             gameState[targetRow][targetCol] = 1;
+
+            // ★ 変更点: 移動が完了した後に状態を履歴に保存
+            saveState(); 
 
             selectedPeg = null;
             renderBoard();
@@ -558,7 +559,7 @@
          */
         function undoMove() {
             if (history.length > 1) { // 初期状態より前の状態がある場合のみ
-                history.pop(); // 現在の状態を破棄
+                history.pop(); // 現在の状態（戻る前の状態）を破棄
                 gameState = JSON.parse(JSON.stringify(history[history.length - 1])); // 前の状態に戻す
                 renderBoard();
                 updateMessage("元に戻しました。");
@@ -647,22 +648,26 @@
         }
 
         /**
-         * 現在のボードの状態（ホールとペグの座標）をコンソールにログ出力します。
+         * 現在のボードの状態をコンソールにログ出力します。
          * @param {string} action - ログを出力するきっかけとなったアクション
          */
         function logBoardState(action) {
             console.log("--------------------");
             console.log(`ボードの状態ログ: ${action}`);
-
-            // ホール（穴）の座標のみをログ出力
-            console.log("ホールの座標:");
+            console.log("現在のボード状態:");
             for (let r = 0; r < 7; r++) {
+                let rowStr = "";
                 for (let c = 0; c < 7; c++) {
-                    // 表示されている穴（gameStateが0）のみを対象とする
-                    if (gameState[r][c] === 0) {
-                        console.log(`(row: ${r}, col: ${c})`);
+                    const cellValue = gameState[r][c];
+                    if (cellValue === 1) {
+                        rowStr += "P "; // Peg
+                    } else if (cellValue === 0) {
+                        rowStr += "O "; // Empty hole
+                    } else {
+                        rowStr += "- "; // Hidden/null
                     }
                 }
+                console.log(rowStr);
             }
             console.log("--------------------");
         }
@@ -703,7 +708,7 @@
         }
 
         resetButton.addEventListener('click', initializeBoard);
-        undoButton.addEventListener('click', undoMove); // Undoボタンのイベントリスナーを追加
+        undoButton.addEventListener('click', undoMove);
         rotateCWButton.addEventListener('click', () => rotateBoard(true));
         rotateCCWButton.addEventListener('click', () => rotateBoard(false));
 
