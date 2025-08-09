@@ -11,7 +11,8 @@
             justify-content: center;
             align-items: center;
             flex-direction: column;
-            margin: 20px;
+            margin: 20px; /* 全体の余白 */
+            gap: 15px; /* 子要素間の垂直方向のスペース */
             background-color: #f0f0f0;
             min-height: 100vh; /* ビューポートの高さ全体を最低限確保 */
             overflow-y: auto; /* コンテンツがオーバーフローした場合に垂直スクロールを許可 */
@@ -19,7 +20,8 @@
 
         h1 {
             color: #333;
-            margin-bottom: 15px; /* マージンを微調整 */
+            margin: 0; /* bodyのgapに任せるためマージンをリセット */
+            flex-shrink: 0; /* ヘッダーは縮まないように固定 */
         }
 
         #sudoku-board {
@@ -27,17 +29,17 @@
             grid-template-columns: repeat(9, 1fr);
             grid-template-rows: repeat(9, 1fr);
             
-            /* 盤面のサイズをより適応的に設定 (画面の幅と高さの両方を考慮) */
-            /* 画面の幅から左右のマージン40px (20px*2) を引いた値 と、
-               画面の高さから他の要素の合計高さ約280pxを引いた値 の小さい方を幅・高さに設定 */
-            width: min(calc(100vw - 40px), calc(100vh - 280px));
-            height: min(calc(100vw - 40px), calc(100vh - 280px));
+            /* サイズの制約 */
+            /* 盤面サイズは、最大500px、利用可能な水平スペース、利用可能な垂直スペースの最小値に設定 */
+            width: min(500px, calc(100vw - 40px), calc(100vh - 425px)); /* 垂直方向のバッファをさらに調整 */
+            height: min(500px, calc(100vw - 40px), calc(100vh - 425px)); /* 高さも幅と同じ計算を適用 */
             
             max-width: 500px; /* 最大幅 */
             max-height: 500px; /* 最大高さ */
-            min-width: 280px; /* 最小幅 */
-            min-height: 280px; /* 最小高さ */
+            min-width: 80px; /* 最小幅 */
+            min-height: 80px; /* 最小高さ */
             
+            /* aspect-ratio: 1 / 1; は width と height の明示的な min() 計算により不要になるが、保険として残す */
             aspect-ratio: 1 / 1; /* 常に正方形を維持 */
             box-sizing: border-box; /* パディングとボーダーを幅と高さに含める */
 
@@ -45,7 +47,8 @@
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 影を追加 */
             border-radius: 8px; /* 角を丸くする */
             overflow: hidden; /* 角丸で内容がはみ出さないようにする */
-            margin-bottom: 15px; /* ボタンとの間にスペースを調整 */
+            margin: 0; /* bodyのgapに任せるためマージンをリセット */
+            align-self: center; /* 中央揃え */
         }
 
         .cell {
@@ -53,9 +56,12 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 2vmin; /* 画面の高さに応じてフォントサイズを調整 */
+            /* clamp(最小値, 推奨値, 最大値) */
+            font-size: clamp(10px, 3.5vmin, 30px); /* フォントサイズを調整 */
             box-sizing: border-box;
             background-color: #fff;
+            line-height: 1; /* 行の高さを明示的に設定して余分なスペースを削除 */
+            height: 100%; /* セルがグリッド行トラックの高さ全体を埋めるように強制 */
         }
 
         /* 3x3ブロックの太いボーダー */
@@ -83,8 +89,9 @@
             font-weight: bold;
             color: #333;
             background-color: #e9e9e9; /* 少し暗い背景色 */
-            font-size: 5vmin; /* 数字を大きく表示 */
+            font-size: clamp(15px, 6vmin, 35px); /* フォントサイズを調整 */
             cursor: pointer; /* 強調選択モードのときにカーソルを変える */
+            line-height: 1; /* 行の高さを明示的に設定して余分なスペースを削除 */
         }
         
         /* 既知の枠（初期値）のスタイル */
@@ -112,11 +119,13 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            font-size: 1.8vmin; /* 画面の高さに応じてフォントサイズを調整 */
+            /* clamp(最小値, 推奨値, 最大値) */
+            font-size: clamp(5px, 1.8vmin, 10px); /* フォントサイズを調整 */
             border: 1px solid #ddd;
             cursor: pointer;
             user-select: none; /* テキスト選択を無効にする */
             transition: background-color 0.1s ease; /* ホバー時のトランジション */
+            line-height: 1; /* 行の高さを明示的に設定して余分なスペースを削除 */
         }
 
         .sub-cell:hover {
@@ -160,10 +169,10 @@
         .controls {
             display: flex;
             gap: 8px; /* ボタン間のスペースを微調整 */
-            margin-top: 15px; /* マージンを調整 */
-            margin-bottom: 10px; /* コントロールの下にマージンを追加 */
             flex-wrap: wrap; /* 小さい画面でボタンを折り返す */
             justify-content: center;
+            margin: 0; /* bodyのgapに任せるためマージンをリセット */
+            flex-shrink: 0; /* コントロールは縮まないように固定 */
         }
 
         .controls button {
@@ -204,7 +213,6 @@
 
         /* メッセージボックスのスタイル */
         #messageBox {
-            margin-top: 20px;
             padding: 15px 25px;
             border-radius: 8px;
             background-color: #f8d7da; /* エラー系 */
@@ -217,6 +225,8 @@
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
             opacity: 0; /* 最初は非表示 */
             transition: opacity 0.5s ease-in-out;
+            margin: 0; /* bodyのgapに任せるためマージンをリセット */
+            flex-shrink: 0; /* メッセージボックスは縮まないように固定 */
         }
         #messageBox.success {
             background-color: #d4edda; /* 成功系 */
@@ -233,11 +243,11 @@
         }
         
         .option-group {
-            margin-top: 10px;
-            margin-bottom: 20px; /* メッセージボックスの上にスペースを確保 */
             display: flex;
             align-items: center;
             gap: 5px;
+            margin: 0; /* bodyのgapに任せるためマージンをリセット */
+            flex-shrink: 0; /* オプショングループは縮まないように固定 */
         }
     </style>
 </head>
@@ -285,7 +295,7 @@
         const boardElement = document.getElementById('sudoku-board');
         const undoBtn = document.getElementById('undoBtn');
         const clearUnknownBtn = document.getElementById('clearUnknownBtn');
-        const newProblemBtn = document.getElementById('newProblemBtn');
+        const newProblemBtn = document.getElementById('newProblemBtn'); 
         const highlightBtn = document.getElementById('highlightBtn');
         const saveBtn = document.getElementById('saveBtn');
         const loadBtn = document.getElementById('loadBtn');
@@ -293,6 +303,10 @@
         const messageBox = document.getElementById('messageBox');
         const body = document.body;
         const disableKnownCellsCheckbox = document.getElementById('disableKnownCellsCheckbox');
+        const h1Element = document.querySelector('h1');
+        const controlsElement = document.querySelector('.controls');
+        const optionGroupElement = document.querySelector('.option-group');
+
 
         /**
          * 盤面のディープコピーを作成するヘルパー関数
@@ -492,6 +506,7 @@
                 }
             }
             updateControlsState();
+            logElementSizes(); // サイズ情報をログに出力
         }
 
         /**
@@ -815,6 +830,56 @@
             undoBtn.disabled = history.length <= 1;
         }
 
+        /**
+         * 各要素のサイズ情報をコンソールに出力する関数
+         * この関数はデバッグ目的で、画面のサイズ変更時に自動的に実行されます。
+         */
+        function logElementSizes() {
+            // DOMがレンダリングされてからサイズを取得するため、少し遅延させる
+            setTimeout(() => {
+                console.log("--- 要素サイズ情報 ---");
+                console.log("Window inner dimensions:", window.innerWidth, "x", window.innerHeight);
+                
+                const bodyRect = document.body.getBoundingClientRect();
+                console.log("Body offset dimensions (width x height):", document.body.offsetWidth, "x", document.body.offsetHeight);
+                console.log("Body bounding client rect (top, right, bottom, left, width, height):", bodyRect.top, bodyRect.right, bodyRect.bottom, bodyRect.left, bodyRect.width, bodyRect.height);
+
+                const h1Rect = h1Element.getBoundingClientRect();
+                console.log("H1 ('数独シミュレータ') dimensions:", h1Rect.width, "x", h1Rect.height, "Top:", h1Rect.top);
+
+                const boardRect = boardElement.getBoundingClientRect();
+                console.log("Sudoku Board dimensions:", boardRect.width, "x", boardRect.height, "Top:", boardRect.top);
+                
+                // 最初のセルの情報を追加
+                const firstCell = boardElement.querySelector('.cell');
+                if (firstCell) {
+                    const firstCellRect = firstCell.getBoundingClientRect();
+                    console.log("First Cell dimensions (approx):", firstCellRect.width, "x", firstCellRect.height);
+
+                    // 最初のセル内にサブグリッドがある場合、その最初のサブセルの情報を追加
+                    const firstSubGrid = firstCell.querySelector('.sub-grid');
+                    if (firstSubGrid) {
+                        const firstSubCell = firstSubGrid.querySelector('.sub-cell');
+                        if (firstSubCell) {
+                            const firstSubCellRect = firstSubCell.getBoundingClientRect();
+                            console.log("First Sub-Cell dimensions (approx):", firstSubCellRect.width, "x", firstSubCellRect.height);
+                        }
+                    }
+                }
+
+                const controlsRect = controlsElement.getBoundingClientRect();
+                console.log("Controls dimensions:", controlsRect.width, "x", controlsRect.height, "Top:", controlsRect.top);
+
+                const optionGroupRect = optionGroupElement.getBoundingClientRect();
+                console.log("Option Group dimensions:", optionGroupRect.width, "x", optionGroupRect.height, "Top:", optionGroupRect.top);
+
+                const messageBoxRect = messageBox.getBoundingClientRect();
+                console.log("Message Box dimensions:", messageBoxRect.width, "x", messageBoxRect.height, "Top:", messageBoxRect.top);
+                console.log("--- サイズ情報ここまで ---");
+
+            }, 100); 
+        }
+
         // イベントリスナーを設定
         undoBtn.addEventListener('click', undoLastMove);
         clearUnknownBtn.addEventListener('click', clearAllCellsToUnknown);
@@ -837,6 +902,9 @@
 
         // ページロード時に盤面を生成
         generateNewPuzzle();
+
+        // ウィンドウのリサイズイベントを監視して、サイズ情報をログに出力
+        window.addEventListener('resize', logElementSizes);
     </script>
 </body>
 </html>
