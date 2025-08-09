@@ -198,6 +198,11 @@
             color: #155724;
             border-color: #c3e6cb;
         }
+        #messageBox.info {
+            background-color: #cce5ff;
+            color: #004085;
+            border-color: #b8daff;
+        }
         #messageBox.visible {
             opacity: 1; /* 表示 */
         }
@@ -217,9 +222,7 @@
         <button id="checkSolutionBtn">解の存在を判定</button>
     </div>
     
-    <div id="messageBox"></div> <!-- メッセージ表示用 -->
-
-    <script>
+    <div id="messageBox"></div> <script>
         // 現在の数独盤面。ユーザーの入力によって変更されます。
         let currentBoard = [
             [5, 3, 0, 0, 7, 0, 0, 0, 0],
@@ -541,6 +544,36 @@
             }
             return true;
         }
+        
+        /**
+         * 解の数を数えるためのバックトラッキングソルバー
+         * @param {Array<Array<number>>} board - 解の数を数える盤面（変更される）
+         * @param {number} count - 現在見つかっている解の数
+         * @returns {number} 見つかった解の総数
+         */
+        function countSolutions(board, count = 0) {
+            if (count > 1) { // 2つ以上見つかった時点で中断
+                return count;
+            }
+
+            for (let r = 0; r < 9; r++) {
+                for (let c = 0; c < 9; c++) {
+                    if (board[r][c] === 0) {
+                        for (let num = 1; num <= 9; num++) {
+                            if (isValidPlacement(board, r, c, num)) {
+                                board[r][c] = num;
+                                count = countSolutions(board, count);
+                                board[r][c] = 0;
+                                if (count > 1) return count; // 2つ以上見つかったら即時終了
+                            }
+                        }
+                        return count;
+                    }
+                }
+            }
+            return count + 1; // 盤面が埋まったら解が1つ増えた
+        }
+
 
         /**
          * 指定された位置に数字を置けるかチェックするヘルパー関数
@@ -665,12 +698,14 @@
          * 現在の盤面に解が存在するかどうかを判定する
          */
         function checkSolution() {
-            // 現在の盤面のコピーを作成し、ソルバーで解けるか試す
+            // 現在の盤面のコピーを作成し、ソルバーで解の数を数える
             const boardToSolve = deepCopyBoard(currentBoard);
-            const hasSolution = solveSudoku(boardToSolve);
+            const solutionCount = countSolutions(boardToSolve);
             
-            if (hasSolution) {
-                showMessage("この盤面は解ける可能性があります。", "success");
+            if (solutionCount === 1) {
+                showMessage("この盤面は解ける可能性があり、一意な解が存在するようです。", "success");
+            } else if (solutionCount > 1) {
+                showMessage("この盤面は解ける可能性があり、複数の解が存在するようです。", "info");
             } else {
                 showMessage("この盤面は解が存在しないようです。", "error");
             }
