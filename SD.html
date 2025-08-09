@@ -26,10 +26,13 @@
             display: grid;
             grid-template-columns: repeat(9, 1fr);
             grid-template-rows: repeat(9, 1fr);
-            width: 70vmin; /* 画面の高さの70%を基準に幅を設定 (調整) */
-            height: 70vmin; /* 画面の高さの70%を基準に高さを設定 (調整) */
-            max-width: 500px; /* 最大幅 */
-            max-height: 500px; /* 最大高さ */
+            /* 幅はビューポートの短い辺の90%か、最大500px */
+            width: min(90vmin, 500px); 
+            /* 高さは1:1のアスペクト比で、かつビューポートの高さから他の要素の分を引いた値まで */
+            max-height: calc(100vh - 150px); 
+            aspect-ratio: 1 / 1; /* 常に正方形を維持 */
+            box-sizing: border-box; /* パディングとボーダーを幅と高さに含める */
+
             border: 3px solid #000;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 影を追加 */
             border-radius: 8px; /* 角を丸くする */
