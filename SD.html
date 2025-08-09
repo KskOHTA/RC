@@ -227,7 +227,7 @@
     </style>
 </head>
 <body>
-    <h1>数独シミュレータ</h1>
+    <h1>数独シミュレータ - tas</h1>
     <div id="sudoku-board"></div>
 
     <div class="controls">
@@ -235,8 +235,8 @@
         <button id="clearUnknownBtn">全て空にする</button>
         <button id="newProblemBtn">新しい問題作成</button>
         <button id="highlightBtn">数字を強調</button>
-        <button id="saveBtn">盤面を保存</button>
-        <button id="loadBtn">盤面を呼び出す</button>
+        <button id="saveBtn">盤面保存</button>
+        <button id="loadBtn">盤面呼出</button>
         <button id="checkSolutionBtn">解の存在を判定</button>
     </div>
     
@@ -249,20 +249,12 @@
     <div id="messageBox"></div> 
     <script>
         // 現在の数独盤面。ユーザーの入力によって変更されます。
-        let currentBoard = [
-            [5, 3, 0, 0, 7, 0, 0, 0, 0],
-            [6, 0, 0, 1, 9, 5, 0, 0, 0],
-            [0, 9, 8, 0, 0, 0, 0, 6, 0],
-            [8, 0, 0, 0, 6, 0, 0, 0, 3],
-            [4, 0, 0, 8, 0, 3, 0, 0, 1],
-            [7, 0, 0, 0, 2, 0, 0, 0, 6],
-            [0, 6, 0, 0, 0, 0, 2, 8, 0],
-            [0, 0, 0, 4, 1, 9, 0, 0, 5],
-            [0, 0, 0, 0, 8, 0, 0, 7, 9]
-        ];
+        // ハードコードを削除し、9x9の空の盤面で初期化
+        let currentBoard = new Array(9).fill(0).map(() => new Array(9).fill(0)); 
         
         // 最初の問題の盤面を保持（既知の枠を判別するため）
-        let initialBoard = deepCopyBoard(currentBoard);
+        // ハードコードを削除し、9x9の空の盤面で初期化
+        let initialBoard = new Array(9).fill(0).map(() => new Array(9).fill(0));
 
         // 盤面履歴を保存するスタック（アンドゥ機能用）
         const history = [];
@@ -664,6 +656,10 @@
          * 新しい数独パズルを生成する機能
          */
         function generateNewPuzzle() {
+            // currentBoardが未定義の場合があるため、history.pushの前に初期化を確認
+            if (!currentBoard) {
+                currentBoard = new Array(9).fill(0).map(() => new Array(9).fill(0));
+            }
             history.push(deepCopyBoard(currentBoard));
 
             let tempSolvedBoard = new Array(9).fill(0).map(() => new Array(9).fill(0));
@@ -685,6 +681,7 @@
             currentBoard = deepCopyBoard(newPuzzleTemplate);
             initialBoard = deepCopyBoard(newPuzzleTemplate); // initialBoardも新しい問題で更新
             
+            // historyをクリアしてから新しい初期盤面をpushする
             history.length = 0;
             history.push(deepCopyBoard(currentBoard));
             createBoard();
@@ -826,8 +823,8 @@
 
 
         // ページロード時に盤面を生成
-        createBoard();
-        history.push(deepCopyBoard(currentBoard));
+        // アプリ起動時に新しい問題を作成するように変更
+        generateNewPuzzle();
     </script>
 </body>
 </html>
