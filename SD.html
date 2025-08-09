@@ -98,23 +98,22 @@
             background-color: #e0e0e0; /* ホバー時の背景色 */
         }
 
-        /* 選択されたサブセルのスタイル */
-        .selected {
-            background-color: #a0c0ff; /* 鮮やかな青 */
+        /* 唯一の候補数字のスタイル (このセルの中で唯一) */
+        .single-candidate {
+            color: #ff0000; /* 赤色で表示 */
             font-weight: bold;
-            color: #000;
+        }
+        
+        /* 縦、横、または中枠の中で唯一の候補数字のスタイル */
+        .unique-candidate-highlight {
+            color: #007bff; /* 青色で表示 */
+            font-weight: bold;
         }
 
         /* 不可能な候補数字のスタイル */
         .impossible {
             opacity: 0.2; /* 薄く表示 */
             pointer-events: none; /* クリック不可にする */
-        }
-
-        /* 唯一の候補数字のスタイル */
-        .single-candidate {
-            color: #ff0000; /* 赤色で表示 */
-            font-weight: bold;
         }
 
         .controls {
@@ -277,6 +276,57 @@
         }
 
         /**
+         * 指定された行の中で、特定の数字が唯一の候補であるかをチェックする
+         */
+        function isUniqueCandidateInRow(board, row, col, num) {
+            for (let c = 0; c < 9; c++) {
+                if (c !== col && board[row][c] === 0) {
+                    const possible = getPossibleNumbers(board, row, c);
+                    if (possible.includes(num)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        /**
+         * 指定された列の中で、特定の数字が唯一の候補であるかをチェックする
+         */
+        function isUniqueCandidateInCol(board, row, col, num) {
+            for (let r = 0; r < 9; r++) {
+                if (r !== row && board[r][col] === 0) {
+                    const possible = getPossibleNumbers(board, r, col);
+                    if (possible.includes(num)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        /**
+         * 指定された3x3ブロックの中で、特定の数字が唯一の候補であるかをチェックする
+         */
+        function isUniqueCandidateInBlock(board, row, col, num) {
+            const startRow = Math.floor(row / 3) * 3;
+            const startCol = Math.floor(col / 3) * 3;
+            for (let r = 0; r < 3; r++) {
+                for (let c = 0; c < 3; c++) {
+                    const currentRow = startRow + r;
+                    const currentCol = startCol + c;
+                    if ((currentRow !== row || currentCol !== col) && board[currentRow][currentCol] === 0) {
+                        const possible = getPossibleNumbers(board, currentRow, currentCol);
+                        if (possible.includes(num)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        /**
          * 数独盤面を生成または再描画する関数
          */
         function createBoard() {
@@ -289,7 +339,7 @@
                     const valueInCurrentBoard = currentBoard[row][col];
 
                     if (valueInCurrentBoard !== 0) {
-                        // このセルに現在数字が入力されている場合（初期ヒント、またはユーザー入力）
+                        // このセルに現在数字が入力されている場合
                         cell.textContent = valueInCurrentBoard;
                         cell.classList.add('fixed');
                         
@@ -307,16 +357,20 @@
 
                             if (possibleNumbers.includes(num)) {
                                 subCell.textContent = num;
-                                if (possibleNumbers.length === 1) { // 唯一の候補である場合、赤色にする
-                                    subCell.classList.add('single-candidate');
+                                
+                                if (possibleNumbers.length === 1) { // 唯一の候補（ネイキッドシングル）
+                                    subCell.classList.add('single-candidate'); // 赤色
+                                } else if (isUniqueCandidateInRow(currentBoard, row, col, num) || // 行、列、またはブロックで唯一の候補（隠れたシングル）
+                                           isUniqueCandidateInCol(currentBoard, row, col, num) ||
+                                           isUniqueCandidateInBlock(currentBoard, row, col, num)) {
+                                    subCell.classList.add('unique-candidate-highlight'); // 青色
                                 }
                             } else {
                                 subCell.textContent = '';
                                 subCell.classList.add('impossible');
                             }
                             subCell.addEventListener('click', (event) => {
-                                // 親セルにもイベントリスナーがある場合にバブリングを防ぐ
-                                event.stopPropagation(); // Avoid event bubbling to the parent cell
+                                event.stopPropagation();
                                 handleSubCellClick(subCell, row, col);
                             });
                             subGrid.appendChild(subCell);
@@ -326,7 +380,7 @@
                     boardElement.appendChild(cell);
                 }
             }
-            updateControlsState(); // 盤面更新後にボタンの状態を更新
+            updateControlsState();
         }
 
         /**
@@ -335,9 +389,9 @@
          * @param {number} col クリックされたセルの列インデックス
          */
         function handleUserEnteredCellClick(row, col) {
-            history.push(deepCopyBoard(currentBoard)); // クリアする前に現在の状態を履歴に保存
-            currentBoard[row][col] = 0; // 数字をクリア
-            createBoard(); // 盤面を再描画
+            history.push(deepCopyBoard(currentBoard));
+            currentBoard[row][col] = 0;
+            createBoard();
             console.log(`セル (${row}, ${col}) の数字がクリアされました。`);
         }
 
@@ -348,17 +402,15 @@
          * @param {number} col クリックされたセルの列インデックス
          */
         function handleSubCellClick(clickedSubCell, row, col) {
-            // 不可能な数字のサブセルがクリックされた場合は何もしない
             if (clickedSubCell.classList.contains('impossible')) {
                 return;
             }
 
-            history.push(deepCopyBoard(currentBoard)); // 操作前の盤面を履歴に保存
+            history.push(deepCopyBoard(currentBoard));
 
-            const selectedValue = parseInt(clickedSubCell.dataset.value); // 選択された数字を取得
-            currentBoard[row][col] = selectedValue; // 数字を確定
+            const selectedValue = parseInt(clickedSubCell.dataset.value);
+            currentBoard[row][col] = selectedValue;
 
-            // 盤面全体を再描画して、他のセルの候補数字の表示を更新する
             createBoard(); 
             console.log(`セル (${row}, ${col}) に ${selectedValue} が確定されました。`);
         }
@@ -368,32 +420,30 @@
          */
         function undoLastMove() {
             if (history.length > 0) {
-                currentBoard = history.pop(); // 履歴から最後の盤面状態を取り出す
-                createBoard(); // 盤面を再描画
+                currentBoard = history.pop();
+                createBoard();
                 console.log("操作が元に戻されました。");
             } else {
                 console.log("これ以上元に戻す履歴がありません。");
             }
-            updateControlsState(); // ボタンの状態を更新
+            updateControlsState();
         }
 
         /**
          * 盤面上の全てのマスを空にする機能
-         * （オリジナルのヒントを含む全てのマスを未知枠にする）
          */
         function clearAllCellsToUnknown() {
-            history.push(deepCopyBoard(currentBoard)); // 現在の盤面を履歴に保存
+            history.push(deepCopyBoard(currentBoard));
 
-            // currentBoardの全てのセルを0に設定
             for (let row = 0; row < 9; row++) {
                 for (let col = 0; col < 9; col++) {
                     currentBoard[row][col] = 0;
                 }
             }
             
-            createBoard(); // 盤面を再描画
+            createBoard();
             console.log("盤面上の全てのマスが空になりました。");
-            updateControlsState(); // ボタンの状態を更新
+            updateControlsState();
         }
 
         /**
@@ -404,23 +454,22 @@
         function solveSudoku(board) {
             for (let r = 0; r < 9; r++) {
                 for (let c = 0; c < 9; c++) {
-                    if (board[r][c] === 0) { // 空のセルを見つける
-                        // 1から9までの数字をランダムな順序で試す
+                    if (board[r][c] === 0) {
                         const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5); 
                         for (const num of numbers) {
                             if (isValidPlacement(board, r, c, num)) {
-                                board[r][c] = num; // 数字を仮置き
-                                if (solveSudoku(board)) { // 再帰的に次のセルを埋める
+                                board[r][c] = num;
+                                if (solveSudoku(board)) {
                                     return true;
                                 }
-                                board[r][c] = 0; // バックトラック（数字を元に戻す）
+                                board[r][c] = 0;
                             }
                         }
-                        return false; // どの数字も入らない
+                        return false;
                     }
                 }
             }
-            return true; // 全てのセルが埋められた
+            return true;
         }
 
         /**
@@ -432,15 +481,12 @@
          * @returns {boolean} 配置可能かどうか
          */
         function isValidPlacement(board, row, col, num) {
-            // 行をチェック
             for (let c = 0; c < 9; c++) {
                 if (board[row][c] === num) return false;
             }
-            // 列をチェック
             for (let r = 0; r < 9; r++) {
                 if (board[r][col] === num) return false;
             }
-            // 3x3ブロックをチェック
             const startRow = Math.floor(row / 3) * 3;
             const startCol = Math.floor(col / 3) * 3;
             for (let r = 0; r < 3; r++) {
@@ -455,40 +501,38 @@
          * 新しい数独パズルを生成する機能
          */
         function generateNewPuzzle() {
-            history.push(deepCopyBoard(currentBoard)); // 現在の盤面を履歴に保存
+            history.push(deepCopyBoard(currentBoard));
 
             let tempSolvedBoard = new Array(9).fill(0).map(() => new Array(9).fill(0));
-            solveSudoku(tempSolvedBoard); // まず完全に埋まった数独盤面を生成
+            solveSudoku(tempSolvedBoard);
 
-            let cellsToClear = 50; // クリアするセルの数 (難易度調整可能)
-            let newPuzzleTemplate = deepCopyBoard(tempSolvedBoard); // 埋まった盤面をコピー
+            let cellsToClear = 50;
+            let newPuzzleTemplate = deepCopyBoard(tempSolvedBoard);
 
-            // ランダムにセルをクリアしてパズルを作成
             while (cellsToClear > 0) {
                 let r = Math.floor(Math.random() * 9);
                 let c = Math.floor(Math.random() * 9);
 
-                // まだクリアされていないセルであればクリア
                 if (newPuzzleTemplate[r][c] !== 0) {
                     newPuzzleTemplate[r][c] = 0;
                     cellsToClear--;
                 }
             }
 
-            currentBoard = deepCopyBoard(newPuzzleTemplate); // 現在の盤面を新しいパズルに設定
+            currentBoard = deepCopyBoard(newPuzzleTemplate);
             
-            history.length = 0; // 新しいパズルのため履歴をクリア
-            history.push(deepCopyBoard(currentBoard)); // 新しいパズルの初期状態を履歴に追加
+            history.length = 0;
+            history.push(deepCopyBoard(currentBoard));
             createBoard();
             console.log("新しい問題が作成されました。");
-            updateControlsState(); // ボタンの状態を更新
+            updateControlsState();
         }
 
         /**
          * コントロールボタンの状態（有効/無効）を更新する
          */
         function updateControlsState() {
-            undoBtn.disabled = history.length <= 1; // 履歴が初期状態のみの場合はアンドゥを無効化
+            undoBtn.disabled = history.length <= 1;
         }
 
         // イベントリスナーを設定
@@ -498,8 +542,7 @@
 
         // ページロード時に盤面を生成
         createBoard();
-        // 初期状態の盤面を履歴に追加（最初の操作を元に戻せるようにするため）
-        history.push(deepCopyBoard(currentBoard)); 
+        history.push(deepCopyBoard(currentBoard));
     </script>
 </body>
 </html>
