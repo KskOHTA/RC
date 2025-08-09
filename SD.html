@@ -71,6 +71,7 @@
             color: #333;
             background-color: #e9e9e9; /* 少し暗い背景色 */
             font-size: 5vmin; /* 数字を大きく表示 */
+            cursor: pointer; /* 強調選択モードのときにカーソルを変える */
         }
 
         /* 未知のセルのサブグリッド */
@@ -110,10 +111,26 @@
             font-weight: bold;
         }
 
+        /* 強調表示のスタイル */
+        .highlighted {
+            background-color: #ffc107; /* 黄色で強調 */
+            animation: pulse-highlight 1s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse-highlight {
+            from { background-color: #ffc107; }
+            to { background-color: #ffe5a8; }
+        }
+
         /* 不可能な候補数字のスタイル */
         .impossible {
             opacity: 0.2; /* 薄く表示 */
             pointer-events: none; /* クリック不可にする */
+        }
+        
+        /* 強調選択モード時のカーソル */
+        body.selection-mode #sudoku-board .fixed {
+            cursor: crosshair;
         }
 
         .controls {
@@ -143,7 +160,7 @@
 
         .controls button:active {
             transform: translateY(0);
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
         }
 
         .controls button:disabled {
@@ -162,11 +179,13 @@
         <button id="undoBtn">元に戻す</button>
         <button id="clearUnknownBtn">全て空にする</button>
         <button id="newProblemBtn">新しい問題作成</button>
+        <button id="highlightBtn">数字を強調</button>
+        <button id="saveBtn">盤面を保存</button>
+        <button id="loadBtn">盤面を呼び出す</button>
     </div>
 
     <script>
         // 現在の数独盤面。ユーザーの入力によって変更されます。
-        // 「新しい問題作成」ボタンでこの値が更新されます。
         let currentBoard = [
             [5, 3, 0, 0, 7, 0, 0, 0, 0],
             [6, 0, 0, 1, 9, 5, 0, 0, 0],
@@ -181,17 +200,25 @@
 
         // 盤面履歴を保存するスタック（アンドゥ機能用）
         const history = [];
+        
+        // 強調表示の状態を管理する変数
+        let isHighlightingActive = false;
+        let highlightedNumber = null;
+        let isSelectionMode = false; // 新しい状態: 数字選択待ちモード
+        const savedBoardKey = 'sudokuSavedBoard';
 
         // 盤面要素を取得
         const boardElement = document.getElementById('sudoku-board');
         const undoBtn = document.getElementById('undoBtn');
         const clearUnknownBtn = document.getElementById('clearUnknownBtn');
         const newProblemBtn = document.getElementById('newProblemBtn');
+        const highlightBtn = document.getElementById('highlightBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const loadBtn = document.getElementById('loadBtn');
+        const body = document.body;
 
         /**
          * 盤面のディープコピーを作成するヘルパー関数
-         * @param {Array<Array<number>>} board - コピーする盤面
-         * @returns {Array<Array<number>>} ディープコピーされた盤面
          */
         function deepCopyBoard(board) {
             return JSON.parse(JSON.stringify(board));
@@ -199,9 +226,6 @@
 
         /**
          * 指定された行に存在する数字のSetを返すヘルパー関数
-         * @param {Array<Array<number>>} board - 現在の数独盤面
-         * @param {number} row - チェックする行のインデックス
-         * @returns {Set<number>} 行に存在する数字のSet
          */
         function getNumbersInRow(board, row) {
             const numbers = new Set();
@@ -215,9 +239,6 @@
 
         /**
          * 指定された列に存在する数字のSetを返すヘルパー関数
-         * @param {Array<Array<number>>} board - 現在の数独盤面
-         * @param {number} col - チェックする列のインデックス
-         * @returns {Set<number>} 列に存在する数字のSet
          */
         function getNumbersInCol(board, col) {
             const numbers = new Set();
@@ -231,10 +252,6 @@
 
         /**
          * 指定された3x3ブロックに存在する数字のSetを返すヘルパー関数
-         * @param {Array<Array<number>>} board - 現在の数独盤面
-         * @param {number} row - セルの行インデックス
-         * @param {number} col - セルの列インデックス
-         * @returns {Set<number>} ブロックに存在する数字のSet
          */
         function getNumbersInBlock(board, row, col) {
             const numbers = new Set();
@@ -252,26 +269,15 @@
 
         /**
          * 指定されたセルに入力可能な候補数字の配列を返す関数
-         * @param {Array<Array<number>>} board - 現在の数独盤面
-         * @param {number} row - セルの行インデックス
-         * @param {number} col - セルの列インデックス
-         * @returns {Array<number>} 可能な数字の配列
          */
         function getPossibleNumbers(board, row, col) {
             const possible = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-
-            // 行に存在する数字を除外
             const inRow = getNumbersInRow(board, row);
             inRow.forEach(num => possible.delete(num));
-
-            // 列に存在する数字を除外
             const inCol = getNumbersInCol(board, col);
             inCol.forEach(num => possible.delete(num));
-
-            // ブロックに存在する数字を除外
             const inBlock = getNumbersInBlock(board, row, col);
             inBlock.forEach(num => possible.delete(num));
-
             return Array.from(possible).sort((a, b) => a - b);
         }
 
@@ -331,22 +337,31 @@
          */
         function createBoard() {
             boardElement.innerHTML = ''; // 既存の内容をクリア
+            
+            // 強調選択モードに応じてbodyにクラスを追加/削除
+            if (isSelectionMode) {
+                body.classList.add('selection-mode');
+            } else {
+                body.classList.remove('selection-mode');
+            }
+
             for (let row = 0; row < 9; row++) {
                 for (let col = 0; col < 9; col++) {
                     const cell = document.createElement('div');
                     cell.classList.add('cell');
-
                     const valueInCurrentBoard = currentBoard[row][col];
 
                     if (valueInCurrentBoard !== 0) {
-                        // このセルに現在数字が入力されている場合
                         cell.textContent = valueInCurrentBoard;
                         cell.classList.add('fixed');
                         
-                        // ユーザーが入力した数字はクリックでクリアできるようにする
+                        // 強調表示が有効で、このセルの数字が強調対象と一致する場合
+                        if (isHighlightingActive && valueInCurrentBoard === highlightedNumber) {
+                            cell.classList.add('highlighted');
+                        }
+
                         cell.addEventListener('click', () => handleUserEnteredCellClick(row, col));
                     } else {
-                        // このセルが空（0）の場合、サブグリッドを作成し候補数字を表示
                         const possibleNumbers = getPossibleNumbers(currentBoard, row, col);
                         const subGrid = document.createElement('div');
                         subGrid.classList.add('sub-grid');
@@ -358,12 +373,12 @@
                             if (possibleNumbers.includes(num)) {
                                 subCell.textContent = num;
                                 
-                                if (possibleNumbers.length === 1) { // 唯一の候補（ネイキッドシングル）
-                                    subCell.classList.add('single-candidate'); // 赤色
-                                } else if (isUniqueCandidateInRow(currentBoard, row, col, num) || // 行、列、またはブロックで唯一の候補（隠れたシングル）
+                                if (possibleNumbers.length === 1) {
+                                    subCell.classList.add('single-candidate');
+                                } else if (isUniqueCandidateInRow(currentBoard, row, col, num) ||
                                            isUniqueCandidateInCol(currentBoard, row, col, num) ||
                                            isUniqueCandidateInBlock(currentBoard, row, col, num)) {
-                                    subCell.classList.add('unique-candidate-highlight'); // 青色
+                                    subCell.classList.add('unique-candidate-highlight');
                                 }
                             } else {
                                 subCell.textContent = '';
@@ -385,34 +400,52 @@
 
         /**
          * ユーザーが入力した数字が設定されたセルをクリックした時の処理
-         * @param {number} row クリックされたセルの行インデックス
-         * @param {number} col クリックされたセルの列インデックス
          */
         function handleUserEnteredCellClick(row, col) {
-            history.push(deepCopyBoard(currentBoard));
-            currentBoard[row][col] = 0;
-            createBoard();
-            console.log(`セル (${row}, ${col}) の数字がクリアされました。`);
+            // 強調選択モードではない場合のみ、数字クリアを実行
+            if (!isSelectionMode) {
+                history.push(deepCopyBoard(currentBoard));
+                currentBoard[row][col] = 0;
+                createBoard();
+                console.log(`セル (${row}, ${col}) の数字がクリアされました。`);
+            }
         }
 
         /**
          * サブセルがクリックされた時の処理
-         * @param {HTMLElement} clickedSubCell クリックされたサブセル要素
-         * @param {number} row クリックされたセルの行インデックス
-         * @param {number} col クリックされたセルの列インデックス
          */
         function handleSubCellClick(clickedSubCell, row, col) {
-            if (clickedSubCell.classList.contains('impossible')) {
-                return;
+            // 強調選択モードではない場合のみ、数字入力を実行
+            if (!isSelectionMode) {
+                if (clickedSubCell.classList.contains('impossible')) {
+                    return;
+                }
+
+                history.push(deepCopyBoard(currentBoard));
+
+                const selectedValue = parseInt(clickedSubCell.dataset.value);
+                currentBoard[row][col] = selectedValue;
+
+                createBoard(); 
+                console.log(`セル (${row}, ${col}) に ${selectedValue} が確定されました。`);
             }
-
-            history.push(deepCopyBoard(currentBoard));
-
-            const selectedValue = parseInt(clickedSubCell.dataset.value);
-            currentBoard[row][col] = selectedValue;
-
-            createBoard(); 
-            console.log(`セル (${row}, ${col}) に ${selectedValue} が確定されました。`);
+        }
+        
+        /**
+         * 盤面クリック時のイベントを処理する
+         */
+        function handleBoardClick(event) {
+            if (isSelectionMode) {
+                const clickedCell = event.target.closest('.fixed');
+                if (clickedCell) {
+                    const num = parseInt(clickedCell.textContent);
+                    isSelectionMode = false;
+                    isHighlightingActive = true;
+                    highlightedNumber = num;
+                    highlightBtn.textContent = '強調をキャンセル'; // ボタンテキストを更新
+                    createBoard();
+                }
+            }
         }
 
         /**
@@ -448,8 +481,6 @@
 
         /**
          * 数独盤面を埋めるためのバックトラッキングソルバー
-         * @param {Array<Array<number>>} board - 埋める盤面（変更される）
-         * @returns {boolean} 盤面が埋められたかどうか
          */
         function solveSudoku(board) {
             for (let r = 0; r < 9; r++) {
@@ -474,11 +505,6 @@
 
         /**
          * 指定された位置に数字を置けるかチェックするヘルパー関数
-         * @param {Array<Array<number>>} board - 現在の盤面
-         * @param {number} row - 行インデックス
-         * @param {number} col - 列インデックス
-         * @param {number} num - チェックする数字
-         * @returns {boolean} 配置可能かどうか
          */
         function isValidPlacement(board, row, col, num) {
             for (let c = 0; c < 9; c++) {
@@ -529,6 +555,69 @@
         }
 
         /**
+         * 既知の数字の強調表示をオン/オフする
+         */
+        function toggleHighlighting() {
+            // 現在のハイライトを解除
+            isHighlightingActive = false;
+            highlightedNumber = null;
+            
+            if (isSelectionMode) {
+                // 選択モードを解除
+                isSelectionMode = false;
+                highlightBtn.textContent = '数字を強調';
+            } else {
+                // 選択モードを有効にする
+                isSelectionMode = true;
+                highlightBtn.textContent = '強調をキャンセル';
+            }
+            
+            createBoard(); // 盤面を再描画してハイライトを適用/解除
+            updateControlsState();
+        }
+
+        /**
+         * 現在の盤面をブラウザのローカルストレージに保存する
+         */
+        function saveBoard() {
+            try {
+                localStorage.setItem(savedBoardKey, JSON.stringify(currentBoard));
+                alert("現在の盤面が保存されました。");
+            } catch (e) {
+                console.error("盤面の保存に失敗しました。", e);
+                alert("盤面の保存に失敗しました。");
+            }
+        }
+
+        /**
+         * 保存された盤面を読み込む
+         */
+        function loadBoard() {
+            try {
+                const savedData = localStorage.getItem(savedBoardKey);
+                if (savedData) {
+                    const savedBoard = JSON.parse(savedData);
+                    // 盤面のサイズを検証（不正なデータを避けるため）
+                    if (Array.isArray(savedBoard) && savedBoard.length === 9 && savedBoard.every(row => Array.isArray(row) && row.length === 9)) {
+                         // 履歴を保存して、ロードした盤面を適用
+                        history.push(deepCopyBoard(currentBoard));
+                        currentBoard = savedBoard;
+                        createBoard();
+                        alert("保存された盤面を読み込みました。");
+                    } else {
+                        alert("保存されたデータが無効です。");
+                    }
+                } else {
+                    alert("保存された盤面がありません。");
+                }
+            } catch (e) {
+                console.error("盤面の読み込みに失敗しました。", e);
+                alert("盤面の読み込みに失敗しました。");
+            }
+        }
+
+
+        /**
          * コントロールボタンの状態（有効/無効）を更新する
          */
         function updateControlsState() {
@@ -539,6 +628,12 @@
         undoBtn.addEventListener('click', undoLastMove);
         clearUnknownBtn.addEventListener('click', clearAllCellsToUnknown);
         newProblemBtn.addEventListener('click', generateNewPuzzle);
+        highlightBtn.addEventListener('click', toggleHighlighting);
+        saveBtn.addEventListener('click', saveBoard);
+        loadBtn.addEventListener('click', loadBoard);
+
+        // 盤面全体にクリックリスナーを一つだけ設定し、イベント委譲で処理する
+        boardElement.addEventListener('click', handleBoardClick);
 
         // ページロード時に盤面を生成
         createBoard();
