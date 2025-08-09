@@ -73,6 +73,17 @@
             font-size: 5vmin; /* 数字を大きく表示 */
             cursor: pointer; /* 強調選択モードのときにカーソルを変える */
         }
+        
+        /* 既知の枠（初期値）のスタイル */
+        .initial-fixed {
+            background-color: #d4d4d4;
+            color: #111;
+        }
+
+        /* 固定されたマス目でクリックが無効な場合のカーソル */
+        .fixed.disabled-fixed-click {
+            cursor: default;
+        }
 
         /* 未知のセルのサブグリッド */
         .sub-grid {
@@ -206,6 +217,13 @@
         #messageBox.visible {
             opacity: 1; /* 表示 */
         }
+        
+        .option-group {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
     </style>
 </head>
 <body>
@@ -222,7 +240,14 @@
         <button id="checkSolutionBtn">解の存在を判定</button>
     </div>
     
-    <div id="messageBox"></div> <script>
+    <!-- 追加したチェックボックス -->
+    <div class="option-group">
+        <input type="checkbox" id="disableKnownCellsCheckbox" checked>
+        <label for="disableKnownCellsCheckbox">確定済みセルをロック</label>
+    </div>
+    
+    <div id="messageBox"></div> 
+    <script>
         // 現在の数独盤面。ユーザーの入力によって変更されます。
         let currentBoard = [
             [5, 3, 0, 0, 7, 0, 0, 0, 0],
@@ -235,6 +260,9 @@
             [0, 0, 0, 4, 1, 9, 0, 0, 5],
             [0, 0, 0, 0, 8, 0, 0, 7, 9]
         ];
+        
+        // 最初の問題の盤面を保持（既知の枠を判別するため）
+        let initialBoard = deepCopyBoard(currentBoard);
 
         // 盤面履歴を保存するスタック（アンドゥ機能用）
         const history = [];
@@ -244,6 +272,9 @@
         let highlightedNumber = null;
         let isSelectionMode = false; // 新しい状態: 数字選択待ちモード
         const savedBoardKey = 'sudokuSavedBoard';
+        
+        // 新しい変数：既知の枠のクリックを無効にするかどうか (デフォルトで有効)
+        let isKnownCellsDisabled = true;
 
         // DOM要素を取得
         const boardElement = document.getElementById('sudoku-board');
@@ -256,6 +287,7 @@
         const checkSolutionBtn = document.getElementById('checkSolutionBtn');
         const messageBox = document.getElementById('messageBox');
         const body = document.body;
+        const disableKnownCellsCheckbox = document.getElementById('disableKnownCellsCheckbox');
 
         /**
          * 盤面のディープコピーを作成するヘルパー関数
@@ -371,6 +403,13 @@
             }
             return true;
         }
+        
+        /**
+         * セルが最初の問題に設定されていた既知の数字であるかを判定
+         */
+        function isInitialFixedCell(row, col) {
+            return initialBoard[row][col] !== 0;
+        }
 
         /**
          * 数独盤面を生成または再描画する関数
@@ -389,19 +428,34 @@
                 for (let col = 0; col < 9; col++) {
                     const cell = document.createElement('div');
                     cell.classList.add('cell');
-                    const valueInCurrentBoard = currentBoard[row][col];
+                    cell.dataset.row = row; // イベント委譲のためにデータ属性を追加
+                    cell.dataset.col = col;
 
-                    if (valueInCurrentBoard !== 0) {
+                    const valueInCurrentBoard = currentBoard[row][col];
+                    const isInitial = isInitialFixedCell(row, col);
+
+                    if (valueInCurrentBoard !== 0) { // セルに数字が入っている場合
                         cell.textContent = valueInCurrentBoard;
                         cell.classList.add('fixed');
                         
+                        if (isInitial) {
+                            cell.classList.add('initial-fixed');
+                        }
+
                         // 強調表示が有効で、このセルの数字が強調対象と一致する場合
                         if (isHighlightingActive && valueInCurrentBoard === highlightedNumber) {
                             cell.classList.add('highlighted');
                         }
 
-                        cell.addEventListener('click', () => handleUserEnteredCellClick(row, col));
-                    } else {
+                        // カーソルとクリック無効のクラス設定
+                        if (isKnownCellsDisabled) {
+                            // 「確定済みセルをロック」がオンの場合、全ての確定数字はクリック不可
+                            cell.classList.add('disabled-fixed-click');
+                        } else {
+                            // オフの場合、全ての確定数字はクリック可能になるため、このクラスは削除
+                            cell.classList.remove('disabled-fixed-click');
+                        }
+                    } else { // 空のセル、サブグリッドを表示
                         const possibleNumbers = getPossibleNumbers(currentBoard, row, col);
                         const subGrid = document.createElement('div');
                         subGrid.classList.add('sub-grid');
@@ -424,10 +478,7 @@
                                 subCell.textContent = '';
                                 subCell.classList.add('impossible');
                             }
-                            subCell.addEventListener('click', (event) => {
-                                event.stopPropagation();
-                                handleSubCellClick(subCell, row, col);
-                            });
+                            // サブセル個別のクリックリスナーは設定せず、イベント委譲で処理する
                             subGrid.appendChild(subCell);
                         }
                         cell.appendChild(subGrid);
@@ -439,51 +490,56 @@
         }
 
         /**
-         * ユーザーが入力した数字が設定されたセルをクリックした時の処理
+         * 盤面上のクリックイベントを処理する（イベント委譲）
          */
-        function handleUserEnteredCellClick(row, col) {
-            // 強調選択モードではない場合のみ、数字クリアを実行
-            if (!isSelectionMode) {
-                history.push(deepCopyBoard(currentBoard));
-                currentBoard[row][col] = 0;
-                createBoard();
-                console.log(`セル (${row}, ${col}) の数字がクリアされました。`);
-            }
-        }
+        function handleBoardClicks(event) {
+            const clickedCellElement = event.target.closest('.cell');
+            if (!clickedCellElement) return; // 数独盤面内のセルではない場合
 
-        /**
-         * サブセルがクリックされた時の処理
-         */
-        function handleSubCellClick(clickedSubCell, row, col) {
-            // 強調選択モードではない場合のみ、数字入力を実行
-            if (!isSelectionMode) {
-                if (clickedSubCell.classList.contains('impossible')) {
-                    return;
-                }
+            const row = parseInt(clickedCellElement.dataset.row);
+            const col = parseInt(clickedCellElement.dataset.col);
 
-                history.push(deepCopyBoard(currentBoard));
-
-                const selectedValue = parseInt(clickedSubCell.dataset.value);
-                currentBoard[row][col] = selectedValue;
-
-                createBoard(); 
-                console.log(`セル (${row}, ${col}) に ${selectedValue} が確定されました。`);
-            }
-        }
-        
-        /**
-         * 盤面クリック時のイベントを処理する
-         */
-        function handleBoardClick(event) {
+            // 強調選択モードの場合の処理
             if (isSelectionMode) {
-                const clickedCell = event.target.closest('.fixed');
-                if (clickedCell) {
-                    const num = parseInt(clickedCell.textContent);
+                // 強調選択モードでは、常に fixed セルのクリックを許可する（クリア目的ではないため）
+                if (clickedCellElement.classList.contains('fixed')) {
+                    const num = parseInt(clickedCellElement.textContent);
                     isSelectionMode = false;
                     isHighlightingActive = true;
                     highlightedNumber = num;
                     highlightBtn.textContent = `強調解除 (${num})`;
                     createBoard();
+                }
+                return; // 強調選択モードの処理が完了したら、他の処理は行わない
+            }
+
+            // 通常のゲームプレイ時のクリック処理
+            if (currentBoard[row][col] !== 0) { // セルに数字が入っている場合 (確定済みセル)
+                // 「確定済みセルをロック」が有効な場合、編集を許可しない
+                if (isKnownCellsDisabled) {
+                    showMessage("このマスは編集できません。", "info");
+                    return; 
+                } else {
+                    // ロックが無効な場合、確定済みセルをクリア可能にする
+                    history.push(deepCopyBoard(currentBoard));
+                    currentBoard[row][col] = 0;
+                    createBoard();
+                    showMessage(`セル (${row}, ${col}) の数字がクリアされました。`, "success");
+                }
+            } else { // セルが空の場合（サブセルへのクリックを処理）
+                const clickedSubCellElement = event.target.closest('.sub-cell');
+                if (clickedSubCellElement) {
+                    const selectedValue = parseInt(clickedSubCellElement.dataset.value);
+                    
+                    // 候補数字として不可能マークされている場合は何もしない
+                    if (clickedSubCellElement.classList.contains('impossible')) {
+                        return;
+                    }
+
+                    history.push(deepCopyBoard(currentBoard));
+                    currentBoard[row][col] = selectedValue;
+                    createBoard();
+                    showMessage(`セル (${row}, ${col}) に ${selectedValue} が確定されました。`, "success");
                 }
             }
         }
@@ -492,7 +548,7 @@
          * 最後の操作を取り消す（アンドゥ）機能
          */
         function undoLastMove() {
-            if (history.length > 0) {
+            if (history.length > 1) {
                 currentBoard = history.pop();
                 createBoard();
                 showMessage("操作が元に戻されました。", "success");
@@ -504,15 +560,19 @@
 
         /**
          * 盤面上の全てのマスを空にする機能
+         * （初期の数字も含めて全て空にする）
          */
         function clearAllCellsToUnknown() {
-            history.push(deepCopyBoard(currentBoard));
+            history.push(deepCopyBoard(currentBoard)); // 現在の盤面を履歴に保存
 
+            // 全てのマスを0（空）にする
             for (let row = 0; row < 9; row++) {
                 for (let col = 0; col < 9; col++) {
                     currentBoard[row][col] = 0;
                 }
             }
+            // initialBoardもクリアして、どのマスも初期値ではない状態にする
+            initialBoard = new Array(9).fill(0).map(() => new Array(9).fill(0));
             
             createBoard();
             showMessage("盤面上の全てのマスが空になりました。", "success");
@@ -623,6 +683,7 @@
             }
 
             currentBoard = deepCopyBoard(newPuzzleTemplate);
+            initialBoard = deepCopyBoard(newPuzzleTemplate); // initialBoardも新しい問題で更新
             
             history.length = 0;
             history.push(deepCopyBoard(currentBoard));
@@ -659,7 +720,12 @@
          */
         function saveBoard() {
             try {
-                localStorage.setItem(savedBoardKey, JSON.stringify(currentBoard));
+                // 盤面と初期盤面の両方を保存する
+                const dataToSave = {
+                    current: currentBoard,
+                    initial: initialBoard
+                };
+                localStorage.setItem(savedBoardKey, JSON.stringify(dataToSave));
                 showMessage("現在の盤面が保存されました。", "success");
             } catch (e) {
                 console.error("盤面の保存に失敗しました。", e);
@@ -674,12 +740,16 @@
             try {
                 const savedData = localStorage.getItem(savedBoardKey);
                 if (savedData) {
-                    const savedBoard = JSON.parse(savedData);
+                    const parsedData = JSON.parse(savedData);
+                    const savedCurrentBoard = parsedData.current;
+                    const savedInitialBoard = parsedData.initial;
+
                     // 盤面のサイズを検証（不正なデータを避けるため）
-                    if (Array.isArray(savedBoard) && savedBoard.length === 9 && savedBoard.every(row => Array.isArray(row) && row.length === 9)) {
+                    if (Array.isArray(savedCurrentBoard) && savedCurrentBoard.length === 9 && savedCurrentBoard.every(row => Array.isArray(row) && row.length === 9)) {
                          // 履歴を保存して、ロードした盤面を適用
                         history.push(deepCopyBoard(currentBoard));
-                        currentBoard = savedBoard;
+                        currentBoard = savedCurrentBoard;
+                        initialBoard = savedInitialBoard; // initialBoardも読み込み
                         createBoard();
                         showMessage("保存された盤面を読み込みました。", "success");
                     } else {
@@ -743,9 +813,17 @@
         saveBtn.addEventListener('click', saveBoard);
         loadBtn.addEventListener('click', loadBoard);
         checkSolutionBtn.addEventListener('click', checkSolution);
+        
+        // 数独盤面全体に対するクリックイベントリスナーを1つだけ設定
+        boardElement.addEventListener('click', handleBoardClicks);
 
-        // 盤面全体にクリックリスナーを一つだけ設定し、イベント委譲で処理する
-        boardElement.addEventListener('click', handleBoardClick);
+        // 新しく追加したチェックボックスのイベントリスナー
+        disableKnownCellsCheckbox.addEventListener('change', (event) => {
+            isKnownCellsDisabled = event.target.checked;
+            createBoard(); // 設定変更時に盤面を再描画して、クリック制御を適用
+            showMessage(`確定済みセルのロックが${isKnownCellsDisabled ? '有効' : '無効'}になりました。`, "info");
+        });
+
 
         // ページロード時に盤面を生成
         createBoard();
