@@ -152,6 +152,13 @@
             transition: background-color 0.2s ease, transform 0.1s ease;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+        
+        #checkSolutionBtn {
+            background-color: #28a745;
+        }
+        #checkSolutionBtn:hover {
+            background-color: #218838;
+        }
 
         .controls button:hover {
             background-color: #0056b3;
@@ -169,6 +176,31 @@
             box-shadow: none;
             transform: none;
         }
+
+        /* メッセージボックスのスタイル */
+        #messageBox {
+            margin-top: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            background-color: #f8d7da; /* エラー系 */
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            font-size: 1.1em;
+            text-align: center;
+            min-width: 250px;
+            max-width: 90vw;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            opacity: 0; /* 最初は非表示 */
+            transition: opacity 0.5s ease-in-out;
+        }
+        #messageBox.success {
+            background-color: #d4edda; /* 成功系 */
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        #messageBox.visible {
+            opacity: 1; /* 表示 */
+        }
     </style>
 </head>
 <body>
@@ -182,7 +214,10 @@
         <button id="highlightBtn">数字を強調</button>
         <button id="saveBtn">盤面を保存</button>
         <button id="loadBtn">盤面を呼び出す</button>
+        <button id="checkSolutionBtn">解の存在を判定</button>
     </div>
+    
+    <div id="messageBox"></div> <!-- メッセージ表示用 -->
 
     <script>
         // 現在の数独盤面。ユーザーの入力によって変更されます。
@@ -207,7 +242,7 @@
         let isSelectionMode = false; // 新しい状態: 数字選択待ちモード
         const savedBoardKey = 'sudokuSavedBoard';
 
-        // 盤面要素を取得
+        // DOM要素を取得
         const boardElement = document.getElementById('sudoku-board');
         const undoBtn = document.getElementById('undoBtn');
         const clearUnknownBtn = document.getElementById('clearUnknownBtn');
@@ -215,6 +250,8 @@
         const highlightBtn = document.getElementById('highlightBtn');
         const saveBtn = document.getElementById('saveBtn');
         const loadBtn = document.getElementById('loadBtn');
+        const checkSolutionBtn = document.getElementById('checkSolutionBtn');
+        const messageBox = document.getElementById('messageBox');
         const body = document.body;
 
         /**
@@ -442,7 +479,7 @@
                     isSelectionMode = false;
                     isHighlightingActive = true;
                     highlightedNumber = num;
-                    highlightBtn.textContent = '強調をキャンセル'; // ボタンテキストを更新
+                    highlightBtn.textContent = `強調解除 (${num})`;
                     createBoard();
                 }
             }
@@ -455,9 +492,9 @@
             if (history.length > 0) {
                 currentBoard = history.pop();
                 createBoard();
-                console.log("操作が元に戻されました。");
+                showMessage("操作が元に戻されました。", "success");
             } else {
-                console.log("これ以上元に戻す履歴がありません。");
+                showMessage("これ以上元に戻す履歴がありません。", "error");
             }
             updateControlsState();
         }
@@ -475,12 +512,14 @@
             }
             
             createBoard();
-            console.log("盤面上の全てのマスが空になりました。");
+            showMessage("盤面上の全てのマスが空になりました。", "success");
             updateControlsState();
         }
 
         /**
          * 数独盤面を埋めるためのバックトラッキングソルバー
+         * @param {Array<Array<number>>} board - 埋める盤面（変更される）
+         * @returns {boolean} 盤面が埋められたかどうか
          */
         function solveSudoku(board) {
             for (let r = 0; r < 9; r++) {
@@ -505,6 +544,11 @@
 
         /**
          * 指定された位置に数字を置けるかチェックするヘルパー関数
+         * @param {Array<Array<number>>} board - 現在の盤面
+         * @param {number} row - 行インデックス
+         * @param {number} col - 列インデックス
+         * @param {number} num - チェックする数字
+         * @returns {boolean} 配置可能かどうか
          */
         function isValidPlacement(board, row, col, num) {
             for (let c = 0; c < 9; c++) {
@@ -550,7 +594,7 @@
             history.length = 0;
             history.push(deepCopyBoard(currentBoard));
             createBoard();
-            console.log("新しい問題が作成されました。");
+            showMessage("新しい問題が作成されました。", "success");
             updateControlsState();
         }
 
@@ -570,6 +614,7 @@
                 // 選択モードを有効にする
                 isSelectionMode = true;
                 highlightBtn.textContent = '強調をキャンセル';
+                showMessage("強調したい数字を盤面からタップしてください。", "info");
             }
             
             createBoard(); // 盤面を再描画してハイライトを適用/解除
@@ -582,10 +627,10 @@
         function saveBoard() {
             try {
                 localStorage.setItem(savedBoardKey, JSON.stringify(currentBoard));
-                alert("現在の盤面が保存されました。");
+                showMessage("現在の盤面が保存されました。", "success");
             } catch (e) {
                 console.error("盤面の保存に失敗しました。", e);
-                alert("盤面の保存に失敗しました。");
+                showMessage("盤面の保存に失敗しました。", "error");
             }
         }
 
@@ -603,19 +648,50 @@
                         history.push(deepCopyBoard(currentBoard));
                         currentBoard = savedBoard;
                         createBoard();
-                        alert("保存された盤面を読み込みました。");
+                        showMessage("保存された盤面を読み込みました。", "success");
                     } else {
-                        alert("保存されたデータが無効です。");
+                        showMessage("保存されたデータが無効です。", "error");
                     }
                 } else {
-                    alert("保存された盤面がありません。");
+                    showMessage("保存された盤面がありません。", "info");
                 }
             } catch (e) {
                 console.error("盤面の読み込みに失敗しました。", e);
-                alert("盤面の読み込みに失敗しました。");
+                showMessage("盤面の読み込みに失敗しました。", "error");
             }
         }
 
+        /**
+         * 現在の盤面に解が存在するかどうかを判定する
+         */
+        function checkSolution() {
+            // 現在の盤面のコピーを作成し、ソルバーで解けるか試す
+            const boardToSolve = deepCopyBoard(currentBoard);
+            const hasSolution = solveSudoku(boardToSolve);
+            
+            if (hasSolution) {
+                showMessage("この盤面は解ける可能性があります。", "success");
+            } else {
+                showMessage("この盤面は解が存在しないようです。", "error");
+            }
+        }
+
+        /**
+         * メッセージボックスにメッセージを表示する
+         * @param {string} message - 表示するメッセージ
+         * @param {string} type - 'success', 'error', 'info' のいずれか
+         */
+        function showMessage(message, type) {
+            messageBox.textContent = message;
+            messageBox.className = 'visible'; // まず表示状態にする
+            messageBox.classList.remove('success', 'error', 'info'); // 既存のタイプをリセット
+            messageBox.classList.add(type); // 新しいタイプを追加
+
+            // 3秒後にメッセージを非表示にする
+            setTimeout(() => {
+                messageBox.classList.remove('visible');
+            }, 3000);
+        }
 
         /**
          * コントロールボタンの状態（有効/無効）を更新する
@@ -631,6 +707,7 @@
         highlightBtn.addEventListener('click', toggleHighlighting);
         saveBtn.addEventListener('click', saveBoard);
         loadBtn.addEventListener('click', loadBoard);
+        checkSolutionBtn.addEventListener('click', checkSolution);
 
         // 盤面全体にクリックリスナーを一つだけ設定し、イベント委譲で処理する
         boardElement.addEventListener('click', handleBoardClick);
