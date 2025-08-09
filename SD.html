@@ -13,26 +13,28 @@
             flex-direction: column;
             margin: 20px;
             background-color: #f0f0f0;
+            min-height: 100vh; /* ビューポートの高さ全体を最低限確保 */
+            overflow-y: auto; /* コンテンツがオーバーフローした場合に垂直スクロールを許可 */
         }
 
         h1 {
             color: #333;
-            margin-bottom: 20px;
+            margin-bottom: 15px; /* マージンを微調整 */
         }
 
         #sudoku-board {
             display: grid;
             grid-template-columns: repeat(9, 1fr);
             grid-template-rows: repeat(9, 1fr);
-            width: 90vmin; /* 画面の高さの90%を基準に幅を設定 */
-            height: 90vmin; /* 画面の高さの90%を基準に高さを設定 */
+            width: 85vmin; /* 画面の高さの85%を基準に幅を設定 */
+            height: 85vmin; /* 画面の高さの85%を基準に高さを設定 */
             max-width: 500px; /* 最大幅 */
             max-height: 500px; /* 最大高さ */
             border: 3px solid #000;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 影を追加 */
             border-radius: 8px; /* 角を丸くする */
             overflow: hidden; /* 角丸で内容がはみ出さないようにする */
-            margin-bottom: 20px; /* ボタンとの間にスペースを追加 */
+            margin-bottom: 15px; /* ボタンとの間にスペースを調整 */
         }
 
         .cell {
@@ -146,8 +148,9 @@
 
         .controls {
             display: flex;
-            gap: 10px; /* ボタン間のスペース */
-            margin-top: 10px;
+            gap: 8px; /* ボタン間のスペースを微調整 */
+            margin-top: 15px; /* マージンを調整 */
+            margin-bottom: 10px; /* コントロールの下にマージンを追加 */
             flex-wrap: wrap; /* 小さい画面でボタンを折り返す */
             justify-content: center;
         }
@@ -220,6 +223,7 @@
         
         .option-group {
             margin-top: 10px;
+            margin-bottom: 20px; /* メッセージボックスの上にスペースを確保 */
             display: flex;
             align-items: center;
             gap: 5px;
@@ -227,7 +231,7 @@
     </style>
 </head>
 <body>
-    <h1>数独シミュレータ - tas</h1>
+    <h1>数独シミュレータ</h1>
     <div id="sudoku-board"></div>
 
     <div class="controls">
@@ -235,8 +239,8 @@
         <button id="clearUnknownBtn">全て空にする</button>
         <button id="newProblemBtn">新しい問題作成</button>
         <button id="highlightBtn">数字を強調</button>
-        <button id="saveBtn">盤面保存</button>
-        <button id="loadBtn">盤面呼出</button>
+        <button id="saveBtn">盤面を保存</button>
+        <button id="loadBtn">盤面を呼び出す</button>
         <button id="checkSolutionBtn">解の存在を判定</button>
     </div>
     
@@ -249,11 +253,9 @@
     <div id="messageBox"></div> 
     <script>
         // 現在の数独盤面。ユーザーの入力によって変更されます。
-        // ハードコードを削除し、9x9の空の盤面で初期化
         let currentBoard = new Array(9).fill(0).map(() => new Array(9).fill(0)); 
         
         // 最初の問題の盤面を保持（既知の枠を判別するため）
-        // ハードコードを削除し、9x9の空の盤面で初期化
         let initialBoard = new Array(9).fill(0).map(() => new Array(9).fill(0));
 
         // 盤面履歴を保存するスタック（アンドゥ機能用）
@@ -823,7 +825,6 @@
 
 
         // ページロード時に盤面を生成
-        // アプリ起動時に新しい問題を作成するように変更
         generateNewPuzzle();
     </script>
 </body>
