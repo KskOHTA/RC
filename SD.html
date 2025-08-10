@@ -13,7 +13,7 @@
             flex-direction: column;
             padding: 10px; /* 全体のパディング */
             margin: 0;
-            box-sizing: border-box;
+            box-sizing: border;
             gap: 4px; /* 子要素間の垂直方向のスペースをさらに縮小 */
             background-color: #f0f0f0;
             height: 100vh; /* ビューポートの高さ全体を使用 */
@@ -45,7 +45,7 @@
             border-radius: 8px; /* 角を丸くする */
             overflow: hidden; /* 角丸で内容がはみ出さないようにする */
             margin: 0;
-            align-self: center; /* 中央揃え */
+            /* align-self: center; REMOVED: 親のalign-itemsに従うようにする */
         }
 
         .cell {
@@ -284,8 +284,8 @@
             #main-layout-container {
                 flex-direction: row; /* 盤面と右パネルを左右に並べる */
                 justify-content: center; /* 水平方向中央揃え */
-                align-items: center; /* NEW: 盤面と右パネルを垂直方向中央揃え */
-                height: 100%; /* NEW: 親 (body) の高さを最大限利用 */
+                align-items: flex-start; /* MODIFIED: 盤面と右パネルを垂直方向上揃え */
+                height: 100%; /* 親 (body) の高さを最大限利用 */
                 width: auto; /* 幅はコンテンツと利用可能なスペースによって決まる */
                 flex-grow: 1; /* 残りの水平スペースを全て使う */
                 gap: 15px; /* 盤面と右パネル間のギャップを拡大 */
