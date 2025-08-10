@@ -264,7 +264,7 @@
             #main-layout-container {
                 flex-direction: row; /* 盤面と右パネルを左右に並べる */
                 justify-content: center; /* 水平方向中央揃え */
-                align-items: center; /* 盤面と右パネルを上端揃え */
+                align-items: center; /* 盤面と右パネルを垂直中央揃え */
                 height: 100%; /* 高さ100%を維持してalign-items: center;が機能するように */
                 gap: 15px; /* 盤面と右パネル間のギャップを拡大 */
             }
@@ -278,12 +278,15 @@
                 flex-wrap: wrap; /* ボタンの折り返しを許可 (2列にするため) */
                 flex-direction: row; /* ボタンを横に並べる */
                 justify-content: center; /* ボタンを中央揃え */
-                max-width: 190px; /* 2列に収まるように最大幅を設定 (ボタンサイズによって調整) */
+                /* ボタンの最大幅を調整してキャプションが2行に折り返さないように */
+                max-width: 210px; /* 例えば、各ボタンが約100pxになるように調整 */
             }
 
             .controls button {
                 flex: 1 1 calc(50% - 2.5px); /* 2列にするため、幅を50%からギャップの半分を引いた値に設定 */
                 max-width: calc(50% - 2.5px); /* 明示的な最大幅 */
+                padding: 7px 10px; /* パディングをさらに少し縮小 */
+                font-size: 13px; /* フォントサイズをさらに少し縮小 */
             }
 
             .option-group {
@@ -903,37 +906,60 @@
          */
         function setBoardSize() {
             // bodyのパディングを計算
-            const bodyPaddingsX = parseFloat(getComputedStyle(body).paddingLeft) + parseFloat(getComputedStyle(body).paddingRight);
-            const bodyPaddingsY = parseFloat(getComputedStyle(body).paddingTop) + parseFloat(getComputedStyle(body).paddingBottom);
+            const computedBodyStyle = getComputedStyle(body);
+            const bodyPaddingTop = parseFloat(computedBodyStyle.paddingTop);
+            const bodyPaddingBottom = parseFloat(computedBodyStyle.paddingBottom);
+            const bodyPaddingLeft = parseFloat(computedBodyStyle.paddingLeft);
+            const bodyPaddingRight = parseFloat(computedBodyStyle.paddingRight);
             
-            // h1の高さとbodyのギャップを考慮
             const h1Height = document.querySelector('h1').offsetHeight;
-            const bodyGap = parseFloat(getComputedStyle(body).gap); 
+            const bodyGap = parseFloat(computedBodyStyle.gap); 
 
             // main-layout-containerに利用可能な垂直スペース
-            const availableHeightForMainLayout = window.innerHeight - h1Height - bodyPaddingsY - bodyGap;
+            const availableHeightForMainLayout = window.innerHeight - h1Height - bodyPaddingTop - bodyPaddingBottom - bodyGap;
 
             const mainLayoutContainer = document.getElementById('main-layout-container');
-            // main-layout-containerのギャップはランドスケープモードで変わる可能性があるため、動的に取得
             const mainLayoutContainerGap = parseFloat(getComputedStyle(mainLayoutContainer).gap);
 
             let calculatedBoardSize;
 
             if (window.innerWidth > window.innerHeight) { // ランドスケープモード
                 const rightPanelElement = document.getElementById('right-panel');
-                const controls = rightPanelElement.querySelector('.controls');
-                const optionGroup = rightPanelElement.querySelector('.option-group');
+                const controlsElement = rightPanelElement.querySelector('.controls');
+                const optionGroupElement = rightPanelElement.querySelector('.option-group');
 
-                // 測定のために一時的にランドスケープスタイルの適用を確実にする
-                // この変更はDOMにレンダリングされるまで反映されないため、offsetWidthはすぐに正確な値にならない可能性があります。
-                // ただし、この問題は非常に複雑なため、現行の方法で進めます。
-                // CSSのメディアクエリに頼ることで、JSでの一時的なスタイル適用は不要になることが多いです。
-                // ここでは、CSSメディアクエリが適用されているという前提でoffsetWidthを取得します。
+                // 一時的にスタイルを適用し、正確な幅を測定
+                // CSSメディアクエリと一致させる
+                const originalControlsStyle = controlsElement.style.cssText;
+                const originalOptionGroupStyle = optionGroupElement.style.cssText;
 
+                // ランドスケープモードのCSSルールを一時的に適用してoffsetWidthを正確に取得
+                controlsElement.style.flexWrap = 'wrap';
+                controlsElement.style.flexDirection = 'row';
+                controlsElement.style.justifyContent = 'center';
+                controlsElement.style.maxWidth = '210px'; 
+                // controls内のbutton要素にも一時的にスタイルを適用し、正確なoffsetWidthを計算させる
+                Array.from(controlsElement.children).forEach(button => {
+                    button.style.flex = '1 1 calc(50% - 2.5px)';
+                    button.style.maxWidth = 'calc(50% - 2.5px)';
+                    button.style.padding = '7px 10px';
+                    button.style.fontSize = '13px';
+                });
+                
+                // rightPanelの正確な幅を取得
                 const rightPanelWidth = rightPanelElement.offsetWidth;
                 
+                // スタイルを元に戻す
+                controlsElement.style.cssText = originalControlsStyle;
+                optionGroupElement.style.cssText = originalOptionGroupStyle;
+                Array.from(controlsElement.children).forEach(button => {
+                    button.style.cssText = ''; // 各ボタンのスタイルもリセット
+                });
+
+
                 // メインレイアウトコンテナ内でボードが利用できる幅を計算
-                const availableWidthInMainLayout = window.innerWidth - bodyPaddingsX - rightPanelWidth - mainLayoutContainerGap; 
+                // window.innerWidth - (bodyの左右パディング) - (右パネルの幅) - (メインコンテナのギャップ)
+                const availableWidthInMainLayout = window.innerWidth - bodyPaddingLeft - bodyPaddingRight - rightPanelWidth - mainLayoutContainerGap; 
                 
                 // ボードの高さは、main-layout-containerの利用可能高さを最大とする
                 const boardHeightFromAvailableVertical = availableHeightForMainLayout; 
@@ -946,8 +972,9 @@
                 const rightPanelHeight = rightPanelElement.offsetHeight;
 
                 // メインレイアウトコンテナ内でボードが利用できる高さを計算
+                // availableHeightForMainLayout - (右パネルの高さ) - (メインコンテナのギャップ)
                 const availableHeightInMainLayout = availableHeightForMainLayout - rightPanelHeight - mainLayoutContainerGap; 
-                const availableWidthInMainLayout = window.innerWidth - bodyPaddingsX;
+                const availableWidthInMainLayout = window.innerWidth - bodyPaddingLeft - bodyPaddingRight;
                 
                 // 最終的なボードサイズは、最大500px、利用可能な幅、利用可能な高さのうち最も小さい値
                 calculatedBoardSize = Math.min(500, availableWidthInMainLayout, availableHeightInMainLayout);
