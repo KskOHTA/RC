@@ -267,16 +267,15 @@
             body {
                 flex-direction: row; /* h1 と main-layout-container を横に並べる */
                 justify-content: flex-start; /* 全体を水平方向左揃え */
-                align-items: flex-start; /* NEW: h1 と main-layout-container を垂直方向上揃え */
+                align-items: flex-start; /* h1 と main-layout-container を垂直方向上揃え */
                 gap: 10px; /* h1 と main-layout-container の間のギャップを調整 */
                 padding: 5px; /* 全体のパディングを少し削減 */
             }
 
             h1 {
-                /* h1 は左上に配置される */
-                padding: 0; /* NEW: パディングをゼロにする */
-                margin: 0; /* NEW: マージンをゼロにする */
-                line-height: 1em; /* NEW: 行の高さを制御し、スペースを削減 */
+                padding: 0; /* パディングをゼロにする */
+                margin: 0; /* マージンをゼロにする */
+                line-height: 1em; /* 行の高さを制御し、スペースを削減 */
                 font-size: clamp(20px, 3vw, 28px); /* 少し小さめのフォントサイズに調整 */
                 flex-shrink: 0; /* h1 は縮まないようにする */
                 white-space: nowrap; /* テキストの折り返しを防ぐ */
@@ -285,16 +284,16 @@
             #main-layout-container {
                 flex-direction: row; /* 盤面と右パネルを左右に並べる */
                 justify-content: center; /* 水平方向中央揃え */
-                align-items: flex-start; /* NEW: 盤面と右パネルを垂直方向上揃え */
-                height: auto; /* NEW: 高さ100%の代わりにコンテンツの高さに合わせる */
+                align-items: center; /* NEW: 盤面と右パネルを垂直方向中央揃え */
+                height: 100%; /* NEW: 親 (body) の高さを最大限利用 */
                 width: auto; /* 幅はコンテンツと利用可能なスペースによって決まる */
                 flex-grow: 1; /* 残りの水平スペースを全て使う */
                 gap: 15px; /* 盤面と右パネル間のギャップを拡大 */
             }
 
             #right-panel {
-                justify-content: flex-start; /* NEW: パネル内の要素を垂直方向上揃え */
-                height: auto; /* NEW: 高さ100%の代わりにコンテンツの高さに合わせる */
+                justify-content: flex-start; /* パネル内の要素を垂直方向上揃え */
+                height: auto; /* 高さ100%の代わりにコンテンツの高さに合わせる */
                 padding-top: 5px; /* ボードの上端と揃えるための小さなパディング */
             }
 
@@ -302,7 +301,7 @@
                 flex-wrap: wrap; /* ボタンの折り返しを許可 (2列にするため) */
                 flex-direction: row; /* ボタンを横に並べる */
                 justify-content: center; /* ボタンを中央揃え */
-                max-width: 280px; /* NEW: 調整された最大幅 (ボタンのキャプションが収まるように) */
+                max-width: 280px; /* 調整された最大幅 (ボタンのキャプションが収まるように) */
                 gap: 8px; /* ボタン間のギャップを少し拡大 */
             }
 
@@ -314,7 +313,7 @@
             }
 
             .option-group {
-                align-self: flex-start; /* NEW: チェックボックスを上揃え */
+                align-self: flex-start; /* チェックボックスを上揃え */
             }
         }
     </style>
@@ -964,9 +963,9 @@
                                              - rightPanelWidth
                                              - mainLayoutContainerGap;
                 
-                // 盤面が利用できる垂直方向のスペースを計算 (bodyの上下パディングとh1の高さ、bodyのギャップを考慮)
-                // bodyのalign-itemsがflex-startなので、h1は上部に固定され、main-layout-containerはその下の残りのスペースを占める
-                const availableHeightForBoard = window.innerHeight - bodyPaddingTop - bodyPaddingBottom - h1Element.offsetHeight - bodyGap;
+                // 盤面が利用できる垂直方向のスペースを計算 (bodyの上下パディングのみを考慮)
+                // h1は横並びのため、垂直方向のスペース計算には含めない
+                const availableHeightForBoard = window.innerHeight - bodyPaddingTop - bodyPaddingBottom;
 
 
                 // 最終的なボードサイズは、最大500px、利用可能な幅、利用可能な高さのうち最も小さい値
