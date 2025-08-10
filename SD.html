@@ -149,11 +149,30 @@
             cursor: crosshair;
         }
 
-        .controls {
+        /* メインレイアウトコンテナ */
+        #main-layout-container {
             display: flex;
+            flex-direction: column; /* デフォルトはポートレート (縦方向) */
+            align-items: center; /* 盤面と右パネルを中央揃え */
+            flex-grow: 1; /* body内で利用可能な垂直スペースを全て使う */
+            width: 100%; /* 全幅を使う */
+            gap: 8px; /* 盤面と右パネル間のギャップ (ポートレート時) */
+        }
+
+        /* 右パネル (ボタンとチェックボックスのコンテナ) */
+        #right-panel {
+            display: flex;
+            flex-direction: column; /* ボタンとチェックボックスは常に縦に並ぶ */
+            gap: 8px; /* コントロールとオプショングループ間のギャップ */
+            flex-shrink: 0; /* このパネルは縮まない */
+            justify-content: flex-start; /* パネル内で上揃え */
+        }
+
+        .controls {
+            display: flex; /* Flexboxを有効化 */
             gap: 5px; /* ボタン間のスペースを縮小 */
-            flex-wrap: wrap;
-            justify-content: center;
+            flex-wrap: wrap; /* ボタンが複数行に折り返すのを許可 (ポートレート時) */
+            justify-content: center; /* ボタンを中央揃え */
             margin: 0;
             flex-shrink: 0;
             padding-top: 5px;
@@ -217,9 +236,6 @@
             left: 50%;
             transform: translateX(-50%);
             z-index: 100; /* 他の要素より手前に表示 */
-
-            /* flex-shrink を削除: flexアイテムではなくなったため */
-            /* margin を削除: position absolute なので不要 */
         }
         #messageBox.success {
             background-color: #d4edda;
@@ -242,26 +258,46 @@
             margin: 0;
             flex-shrink: 0;
         }
+
+        /* ランドスケープモード (横長画面) のスタイル */
+        @media (orientation: landscape) {
+            #main-layout-container {
+                flex-direction: row; /* 盤面と右パネルを左右に並べる */
+                justify-content: center; /* 水平方向中央揃え */
+                align-items: flex-start; /* 盤面と右パネルを上端揃え */
+                gap: 15px; /* 盤面と右パネル間のギャップを拡大 */
+            }
+
+            .controls {
+                flex-wrap: nowrap; /* ボタンの折り返しを禁止 */
+                flex-direction: column; /* ボタンを縦に並べる */
+                align-items: flex-start; /* ボタンを左揃え */
+            }
+        }
     </style>
 </head>
 <body>
     <h1>数独シミュレータ</h1>
-    <div id="sudoku-board"></div>
+    <div id="main-layout-container">
+        <div id="sudoku-board"></div>
 
-    <div class="controls">
-        <button id="undoBtn">元に戻す</button>
-        <button id="clearUnknownBtn">全て空にする</button>
-        <button id="newProblemBtn">新しい問題作成</button>
-        <button id="highlightBtn">数字を強調</button>
-        <button id="saveBtn">盤面を保存</button>
-        <button id="loadBtn">盤面を呼び出す</button>
-        <button id="checkSolutionBtn">解の存在を判定</button>
-    </div>
-    
-    <!-- 追加したチェックボックス -->
-    <div class="option-group">
-        <input type="checkbox" id="disableKnownCellsCheckbox" checked>
-        <label for="disableKnownCellsCheckbox">確定済みセルをロック</label>
+        <div id="right-panel">
+            <div class="controls">
+                <button id="undoBtn">元に戻す</button>
+                <button id="clearUnknownBtn">全て空にする</button>
+                <button id="newProblemBtn">新しい問題作成</button>
+                <button id="highlightBtn">数字を強調</button>
+                <button id="saveBtn">盤面を保存</button>
+                <button id="loadBtn">盤面を呼び出す</button>
+                <button id="checkSolutionBtn">解の存在を判定</button>
+            </div>
+            
+            <!-- 追加したチェックボックス -->
+            <div class="option-group">
+                <input type="checkbox" id="disableKnownCellsCheckbox" checked>
+                <label for="disableKnownCellsCheckbox">確定済みセルをロック</label>
+            </div>
+        </div>
     </div>
     
     <div id="messageBox"></div> 
@@ -850,42 +886,70 @@
          * 各UI要素の高さを考慮し、ボードが正確な整数ピクセル値の正方形になるようにします
          */
         function setBoardSize() {
-            const computedBodyStyle = getComputedStyle(body);
-            const bodyPaddingTop = parseFloat(computedBodyStyle.paddingTop);
-            const bodyPaddingBottom = parseFloat(computedBodyStyle.paddingBottom);
-            const bodyGap = parseFloat(computedBodyStyle.gap);
-
-            // 各UI要素の高さを取得
-            const h1Height = document.querySelector('h1').offsetHeight;
-            const controlsHeight = document.querySelector('.controls').offsetHeight;
-            const optionGroupHeight = document.querySelector('.option-group').offsetHeight;
+            // bodyのパディングを計算
+            const bodyPaddingsX = parseFloat(getComputedStyle(body).paddingLeft) + parseFloat(getComputedStyle(body).paddingRight);
+            const bodyPaddingsY = parseFloat(getComputedStyle(body).paddingTop) + parseFloat(getComputedStyle(body).paddingBottom);
             
-            // メッセージボックスはabsolute positioningなので、レイアウトスペースの計算には含めない
-            // const messageBoxActualHeight = messageBox.offsetHeight; // この行は不要になる
+            // h1の高さとbodyのギャップを考慮
+            const h1Height = document.querySelector('h1').offsetHeight;
+            const bodyGap = parseFloat(getComputedStyle(body).gap); 
 
+            // main-layout-containerに利用可能な垂直スペース
+            const availableHeightForMainLayout = window.innerHeight - h1Height - bodyPaddingsY - bodyGap;
 
-            // 固定UI要素とパディング、ギャップの合計高さを計算
-            // h1, sudoku-board (動的), controls, option-group の間に3つのギャップがある
-            const totalFixedUIHeight = h1Height + controlsHeight + optionGroupHeight + bodyPaddingTop + bodyPaddingBottom + (bodyGap * 3); 
+            const mainLayoutContainer = document.getElementById('main-layout-container');
+            const mainLayoutContainerGap = parseFloat(getComputedStyle(mainLayoutContainer).gap);
 
-            // ボードが利用できる垂直方向の最大スペース
-            const maxBoardHeight = window.innerHeight - totalFixedUIHeight;
+            let calculatedBoardSize;
 
-            // ボードが利用できる水平方向の最大スペース（bodyの左右パディングを考慮）
-            const maxBoardWidth = window.innerWidth - (bodyPaddingTop * 2); // 左右のパディングが上下対称と仮定
+            if (window.innerWidth > window.innerHeight) { // ランドスケープモード
+                // main-layout-containerは横方向に要素を並べる
+                // ボードの左側にあり、右パネルが右側にある
+                const rightPanelElement = document.getElementById('right-panel');
+                const controls = document.querySelector('.controls');
 
-            // ボードのサイズは、最大500px、利用可能な幅、利用可能な高さのうち最も小さい値
-            const boardSizeCandidate = Math.min(500, maxBoardWidth, maxBoardHeight);
+                // 測定のために一時的にランドスケープスタイルの適用を確実にする
+                // メディアクエリが適用される前にJSで取得すると、正確な値が得られない場合があるため
+                const originalControlsStyle = controls.style.cssText; 
+                controls.style.flexWrap = 'nowrap';
+                controls.style.flexDirection = 'column';
+                controls.style.alignItems = 'flex-start';
 
+                const rightPanelWidth = rightPanelElement.offsetWidth;
+                
+                // スタイルを元に戻す
+                controls.style.cssText = originalControlsStyle;
+
+                // メインレイアウトコンテナ内でボードが利用できる幅を計算
+                const availableWidthInMainLayout = window.innerWidth - bodyPaddingsX - rightPanelWidth - mainLayoutContainerGap; 
+                
+                // ボードの高さは、main-layout-containerの利用可能高さを最大とする
+                const boardHeightFromAvailableVertical = availableHeightForMainLayout; 
+
+                // 最終的なボードサイズは、最大500px、利用可能な幅、利用可能な高さのうち最も小さい値
+                calculatedBoardSize = Math.min(500, availableWidthInMainLayout, boardHeightFromAvailableVertical);
+
+            } else { // ポートレートモード
+                // main-layout-containerは縦方向に要素を並べる
+                // ボードの下に右パネルがある
+                const rightPanelElement = document.getElementById('right-panel');
+                const rightPanelHeight = rightPanelElement.offsetHeight;
+
+                // メインレイアウトコンテナ内でボードが利用できる高さを計算
+                const availableHeightInMainLayout = availableHeightForMainLayout - rightPanelHeight - mainLayoutContainerGap; 
+                const availableWidthInMainLayout = window.innerWidth - bodyPaddingsX;
+                
+                // 最終的なボードサイズは、最大500px、利用可能な幅、利用可能な高さのうち最も小さい値
+                calculatedBoardSize = Math.min(500, availableWidthInMainLayout, availableHeightInMainLayout);
+            }
+            
             // サブピクセルレンダリングの問題を避けるため、最終的なボードサイズを整数に切り捨て
-            const finalBoardSize = Math.floor(boardSizeCandidate);
+            const finalBoardSize = Math.floor(calculatedBoardSize);
 
-            // ボード要素に計算されたサイズを適用
             boardElement.style.width = `${finalBoardSize}px`;
             boardElement.style.height = `${finalBoardSize}px`;
-            
-            // ボードコンテンツを再描画し、新しいサイズに適応させる
-            createBoard();
+
+            createBoard(); // 新しいサイズで盤面を再描画
         }
 
 
@@ -1056,4 +1120,3 @@
     </script>
 </body>
 </html>
-
