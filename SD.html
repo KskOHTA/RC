@@ -14,7 +14,7 @@
             padding: 10px; /* 全体のパディング */
             margin: 0;
             box-sizing: border-box;
-            gap: 8px; /* 子要素間の垂直方向のスペースを少し縮小 */
+            gap: 4px; /* 子要素間の垂直方向のスペースをさらに縮小 */
             background-color: #f0f0f0;
             height: 100vh; /* ビューポートの高さ全体を使用 */
             overflow: hidden; /* スクロール禁止 */
@@ -28,7 +28,7 @@
             color: #333;
             margin: 0;
             flex-shrink: 0; /* ヘッダーは縮まない */
-            padding-bottom: 5px; /* 下に少しスペース */
+            padding-bottom: 2px; /* 下のスペースをさらに縮小 */
             font-size: clamp(24px, 5vw, 36px); /* レスポンシブなフォントサイズ */
         }
 
@@ -279,14 +279,14 @@
                 flex-direction: row; /* ボタンを横に並べる */
                 justify-content: center; /* ボタンを中央揃え */
                 /* ボタンの最大幅を調整してキャプションが2行に折り返さないように */
-                max-width: 210px; /* 例えば、各ボタンが約100pxになるように調整 */
+                max-width: 230px; /* 例えば、各ボタンが約110pxになるように調整 */
             }
 
             .controls button {
                 flex: 1 1 calc(50% - 2.5px); /* 2列にするため、幅を50%からギャップの半分を引いた値に設定 */
                 max-width: calc(50% - 2.5px); /* 明示的な最大幅 */
-                padding: 7px 10px; /* パディングをさらに少し縮小 */
-                font-size: 13px; /* フォントサイズをさらに少し縮小 */
+                padding: 6px 8px; /* パディングをさらに少し縮小 */
+                font-size: 12px; /* フォントサイズをさらに少し縮小 */
             }
 
             .option-group {
@@ -912,10 +912,12 @@
             const bodyPaddingLeft = parseFloat(computedBodyStyle.paddingLeft);
             const bodyPaddingRight = parseFloat(computedBodyStyle.paddingRight);
             
-            const h1Height = document.querySelector('h1').offsetHeight;
+            const h1Element = document.querySelector('h1');
+            const h1Height = h1Element.offsetHeight;
             const bodyGap = parseFloat(computedBodyStyle.gap); 
 
             // main-layout-containerに利用可能な垂直スペース
+            // h1の下のbodyのgapを考慮
             const availableHeightForMainLayout = window.innerHeight - h1Height - bodyPaddingTop - bodyPaddingBottom - bodyGap;
 
             const mainLayoutContainer = document.getElementById('main-layout-container');
@@ -928,34 +930,40 @@
                 const controlsElement = rightPanelElement.querySelector('.controls');
                 const optionGroupElement = rightPanelElement.querySelector('.option-group');
 
-                // 一時的にスタイルを適用し、正確な幅を測定
-                // CSSメディアクエリと一致させる
-                const originalControlsStyle = controlsElement.style.cssText;
-                const originalOptionGroupStyle = optionGroupElement.style.cssText;
-
                 // ランドスケープモードのCSSルールを一時的に適用してoffsetWidthを正確に取得
+                // ここでスタイルを一時的に適用することで、DOMがこれらのスタイルでレンダリングされたかのように振る舞い、
+                // offsetWidthが正確な値を返すことを期待します。
+                const originalControlsFlexWrap = controlsElement.style.flexWrap;
+                const originalControlsFlexDirection = controlsElement.style.flexDirection;
+                const originalControlsJustifyContent = controlsElement.style.justifyContent;
+                const originalControlsMaxWidth = controlsElement.style.maxWidth;
+                const originalButtonStyles = [];
+                Array.from(controlsElement.children).forEach(button => {
+                    originalButtonStyles.push(button.style.cssText);
+                    button.style.flex = '1 1 calc(50% - 2.5px)';
+                    button.style.maxWidth = 'calc(50% - 2.5px)';
+                    button.style.padding = '6px 8px';
+                    button.style.fontSize = '12px';
+                });
+
                 controlsElement.style.flexWrap = 'wrap';
                 controlsElement.style.flexDirection = 'row';
                 controlsElement.style.justifyContent = 'center';
-                controlsElement.style.maxWidth = '210px'; 
-                // controls内のbutton要素にも一時的にスタイルを適用し、正確なoffsetWidthを計算させる
-                Array.from(controlsElement.children).forEach(button => {
-                    button.style.flex = '1 1 calc(50% - 2.5px)';
-                    button.style.maxWidth = 'calc(50% - 2.5px)';
-                    button.style.padding = '7px 10px';
-                    button.style.fontSize = '13px';
-                });
-                
-                // rightPanelの正確な幅を取得
+                controlsElement.style.maxWidth = '230px'; // 調整された値
+
+                // DOMの再フローを強制するためのトリック（offsetWidthを呼び出すだけでも十分な場合が多い）
+                controlsElement.offsetWidth; // これによりブラウザはレイアウトを再計算する
+
                 const rightPanelWidth = rightPanelElement.offsetWidth;
                 
                 // スタイルを元に戻す
-                controlsElement.style.cssText = originalControlsStyle;
-                optionGroupElement.style.cssText = originalOptionGroupStyle;
-                Array.from(controlsElement.children).forEach(button => {
-                    button.style.cssText = ''; // 各ボタンのスタイルもリセット
+                controlsElement.style.flexWrap = originalControlsFlexWrap;
+                controlsElement.style.flexDirection = originalControlsFlexDirection;
+                controlsElement.style.justifyContent = originalControlsJustifyContent;
+                controlsElement.style.maxWidth = originalControlsMaxWidth;
+                Array.from(controlsElement.children).forEach((button, index) => {
+                    button.style.cssText = originalButtonStyles[index];
                 });
-
 
                 // メインレイアウトコンテナ内でボードが利用できる幅を計算
                 // window.innerWidth - (bodyの左右パディング) - (右パネルの幅) - (メインコンテナのギャップ)
