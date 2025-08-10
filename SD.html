@@ -261,11 +261,29 @@
 
         /* ランドスケープモード (横長画面) のスタイル */
         @media (orientation: landscape) {
+            body {
+                flex-direction: row; /* h1 と main-layout-container を横に並べる */
+                justify-content: center; /* 全体を水平方向中央揃え */
+                align-items: center; /* h1 と main-layout-container を垂直方向中央揃え */
+                gap: 15px; /* h1 と main-layout-container の間のギャップ */
+            }
+
+            h1 {
+                /* h1 は左側に配置され、垂直方向でbodyの中央に揃う */
+                padding-bottom: 0; /* 縦パディングを削除 */
+                margin-bottom: 0; /* 縦マージンを削除 */
+                font-size: clamp(20px, 4vw, 30px); /* 少し小さめのフォントサイズに調整 */
+                flex-shrink: 0; /* h1 は縮まないようにする */
+                /* margin-right: 10px; */ /* body の gap を使うので明示的なマージンは不要 */
+            }
+
             #main-layout-container {
                 flex-direction: row; /* 盤面と右パネルを左右に並べる */
                 justify-content: center; /* 水平方向中央揃え */
                 align-items: center; /* 盤面と右パネルを垂直中央揃え */
                 height: 100%; /* 高さ100%を維持してalign-items: center;が機能するように */
+                width: auto; /* 幅はコンテンツと利用可能なスペースによって決まる */
+                flex-grow: 1; /* 残りの水平スペースを全て使う */
                 gap: 15px; /* 盤面と右パネル間のギャップを拡大 */
             }
 
@@ -278,15 +296,15 @@
                 flex-wrap: wrap; /* ボタンの折り返しを許可 (2列にするため) */
                 flex-direction: row; /* ボタンを横に並べる */
                 justify-content: center; /* ボタンを中央揃え */
-                /* ボタンの最大幅を調整してキャプションが2行に折り返さないように */
-                max-width: 230px; /* 例えば、各ボタンが約110pxになるように調整 */
+                max-width: 250px; /* 調整された最大幅 (ボタンのキャプションが収まるように) */
+                gap: 8px; /* ボタン間のギャップを少し拡大 */
             }
 
             .controls button {
-                flex: 1 1 calc(50% - 2.5px); /* 2列にするため、幅を50%からギャップの半分を引いた値に設定 */
-                max-width: calc(50% - 2.5px); /* 明示的な最大幅 */
-                padding: 6px 8px; /* パディングをさらに少し縮小 */
-                font-size: 12px; /* フォントサイズをさらに少し縮小 */
+                flex: 1 1 calc(50% - 4px); /* 2列にするため、幅を50%からギャップの半分を引いた値に設定 */
+                max-width: calc(50% - 4px); /* 明示的な最大幅 */
+                padding: 8px 10px; /* パディングを調整してボタンのサイズを適切に保つ */
+                font-size: 13px; /* フォントサイズを調整 */
             }
 
             .option-group {
@@ -913,79 +931,47 @@
             const bodyPaddingRight = parseFloat(computedBodyStyle.paddingRight);
             
             const h1Element = document.querySelector('h1');
-            const h1Height = h1Element.offsetHeight;
-            const bodyGap = parseFloat(computedBodyStyle.gap); 
-
-            // main-layout-containerに利用可能な垂直スペース
-            // h1の下のbodyのgapを考慮
-            const availableHeightForMainLayout = window.innerHeight - h1Height - bodyPaddingTop - bodyPaddingBottom - bodyGap;
-
             const mainLayoutContainer = document.getElementById('main-layout-container');
-            const mainLayoutContainerGap = parseFloat(getComputedStyle(mainLayoutContainer).gap);
+            const rightPanelElement = document.getElementById('right-panel');
 
             let calculatedBoardSize;
 
             if (window.innerWidth > window.innerHeight) { // ランドスケープモード
-                const rightPanelElement = document.getElementById('right-panel');
-                const controlsElement = rightPanelElement.querySelector('.controls');
-                const optionGroupElement = rightPanelElement.querySelector('.option-group');
+                // Measure elements *after* CSS media queries have applied
+                const h1Width = h1Element.offsetWidth; // h1の幅を取得
+                const rightPanelWidth = rightPanelElement.offsetWidth; // 右パネルの幅を取得
+                const mainLayoutContainerGap = parseFloat(getComputedStyle(mainLayoutContainer).gap); // main-layout-container内のギャップ
+                const bodyGap = parseFloat(computedBodyStyle.gap); // body内のギャップ（h1とmain-layout-containerの間）
 
-                // ランドスケープモードのCSSルールを一時的に適用してoffsetWidthを正確に取得
-                // ここでスタイルを一時的に適用することで、DOMがこれらのスタイルでレンダリングされたかのように振る舞い、
-                // offsetWidthが正確な値を返すことを期待します。
-                const originalControlsFlexWrap = controlsElement.style.flexWrap;
-                const originalControlsFlexDirection = controlsElement.style.flexDirection;
-                const originalControlsJustifyContent = controlsElement.style.justifyContent;
-                const originalControlsMaxWidth = controlsElement.style.maxWidth;
-                const originalButtonStyles = [];
-                Array.from(controlsElement.children).forEach(button => {
-                    originalButtonStyles.push(button.style.cssText);
-                    button.style.flex = '1 1 calc(50% - 2.5px)';
-                    button.style.maxWidth = 'calc(50% - 2.5px)';
-                    button.style.padding = '6px 8px';
-                    button.style.fontSize = '12px';
-                });
-
-                controlsElement.style.flexWrap = 'wrap';
-                controlsElement.style.flexDirection = 'row';
-                controlsElement.style.justifyContent = 'center';
-                controlsElement.style.maxWidth = '230px'; // 調整された値
-
-                // DOMの再フローを強制するためのトリック（offsetWidthを呼び出すだけでも十分な場合が多い）
-                controlsElement.offsetWidth; // これによりブラウザはレイアウトを再計算する
-
-                const rightPanelWidth = rightPanelElement.offsetWidth;
+                // 盤面が利用できる水平方向のスペースを計算
+                // ウィンドウの幅 - (body左右パディング) - h1の幅 - (h1とmain-layout-container間のギャップ) - 右パネルの幅 - (ボードと右パネル間のギャップ)
+                const availableWidthForBoard = window.innerWidth
+                                             - bodyPaddingLeft
+                                             - bodyPaddingRight
+                                             - h1Width
+                                             - bodyGap 
+                                             - rightPanelWidth
+                                             - mainLayoutContainerGap;
                 
-                // スタイルを元に戻す
-                controlsElement.style.flexWrap = originalControlsFlexWrap;
-                controlsElement.style.flexDirection = originalControlsFlexDirection;
-                controlsElement.style.justifyContent = originalControlsJustifyContent;
-                controlsElement.style.maxWidth = originalControlsMaxWidth;
-                Array.from(controlsElement.children).forEach((button, index) => {
-                    button.style.cssText = originalButtonStyles[index];
-                });
-
-                // メインレイアウトコンテナ内でボードが利用できる幅を計算
-                // window.innerWidth - (bodyの左右パディング) - (右パネルの幅) - (メインコンテナのギャップ)
-                const availableWidthInMainLayout = window.innerWidth - bodyPaddingLeft - bodyPaddingRight - rightPanelWidth - mainLayoutContainerGap; 
-                
-                // ボードの高さは、main-layout-containerの利用可能高さを最大とする
-                const boardHeightFromAvailableVertical = availableHeightForMainLayout; 
+                // 盤面が利用できる垂直方向のスペースを計算 (bodyの上下パディングを引く)
+                const availableHeightForBoard = window.innerHeight - bodyPaddingTop - bodyPaddingBottom;
 
                 // 最終的なボードサイズは、最大500px、利用可能な幅、利用可能な高さのうち最も小さい値
-                calculatedBoardSize = Math.min(500, availableWidthInMainLayout, boardHeightFromAvailableVertical);
+                calculatedBoardSize = Math.min(500, availableWidthForBoard, availableHeightForBoard);
 
             } else { // ポートレートモード
-                const rightPanelElement = document.getElementById('right-panel');
-                const rightPanelHeight = rightPanelElement.offsetHeight;
+                const h1Height = h1Element.offsetHeight; // h1の高さ
+                const rightPanelHeight = rightPanelElement.offsetHeight; // 右パネルの高さ
+                const bodyGap = parseFloat(computedBodyStyle.gap); // body内のギャップ
+                const mainLayoutContainerGap = parseFloat(getComputedStyle(mainLayoutContainer).gap); // main-layout-container内のギャップ
 
-                // メインレイアウトコンテナ内でボードが利用できる高さを計算
-                // availableHeightForMainLayout - (右パネルの高さ) - (メインコンテナのギャップ)
-                const availableHeightInMainLayout = availableHeightForMainLayout - rightPanelHeight - mainLayoutContainerGap; 
+                // 固定UI要素（h1, 右パネル, bodyパディング, bodyギャップ, main-layout-containerギャップ）が消費する合計垂直スペース
+                const totalFixedUIHeight = h1Height + bodyPaddingTop + bodyPaddingBottom + bodyGap + rightPanelHeight + mainLayoutContainerGap; 
+                
                 const availableWidthInMainLayout = window.innerWidth - bodyPaddingLeft - bodyPaddingRight;
                 
-                // 最終的なボードサイズは、最大500px、利用可能な幅、利用可能な高さのうち最も小さい値
-                calculatedBoardSize = Math.min(500, availableWidthInMainLayout, availableHeightInMainLayout);
+                // 最終的なボードサイズは、最大500px、利用可能な幅、残りの垂直スペースのうち最も小さい値
+                calculatedBoardSize = Math.min(500, availableWidthInMainLayout, window.innerHeight - totalFixedUIHeight);
             }
             
             // サブピクセルレンダリングの問題を避けるため、最終的なボードサイズを整数に切り捨て
