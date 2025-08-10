@@ -264,17 +264,17 @@
             body {
                 flex-direction: row; /* h1 と main-layout-container を横に並べる */
                 justify-content: center; /* 全体を水平方向中央揃え */
-                align-items: center; /* h1 と main-layout-container を垂直方向中央揃え */
+                align-items: flex-start; /* h1 と main-layout-container を垂直方向上揃え */
                 gap: 15px; /* h1 と main-layout-container の間のギャップ */
             }
 
             h1 {
-                /* h1 は左側に配置され、垂直方向でbodyの中央に揃う */
+                /* h1 は左上に配置される */
                 padding-bottom: 0; /* 縦パディングを削除 */
                 margin-bottom: 0; /* 縦マージンを削除 */
                 font-size: clamp(20px, 4vw, 30px); /* 少し小さめのフォントサイズに調整 */
                 flex-shrink: 0; /* h1 は縮まないようにする */
-                /* margin-right: 10px; */ /* body の gap を使うので明示的なマージンは不要 */
+                margin-top: 0; /* body の padding-top があるので、h1 のマージンは不要 */
             }
 
             #main-layout-container {
@@ -954,7 +954,9 @@
                                              - mainLayoutContainerGap;
                 
                 // 盤面が利用できる垂直方向のスペースを計算 (bodyの上下パディングを引く)
+                // bodyのalign-itemsをflex-startに変更したため、利用可能な高さはh1を除いた残り全て
                 const availableHeightForBoard = window.innerHeight - bodyPaddingTop - bodyPaddingBottom;
+
 
                 // 最終的なボードサイズは、最大500px、利用可能な幅、利用可能な高さのうち最も小さい値
                 calculatedBoardSize = Math.min(500, availableWidthForBoard, availableHeightForBoard);
