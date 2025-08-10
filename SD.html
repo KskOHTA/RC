@@ -22,6 +22,7 @@
             -moz-user-select: none; /* Firefoxでの選択を禁止 */
             -ms-user-select: none; /* IE/Edgeでの選択を禁止 */
             user-select: none; /* 標準の選択を禁止 */
+            touch-action: manipulation; /* ダブルタップズームを無効化 */
         }
 
         h1 {
@@ -119,14 +120,14 @@
         .single-candidate {
             color: #ff0000;
             font-weight: bold;
-            background-color: #FFFF80; /* ベージュの背景色を追加 */
+            background-color: #F5F5DC; /* ベージュの背景色を追加 */
         }
         
         /* 縦、横、または中枠の中で唯一の候補数字のスタイル */
         .unique-candidate-highlight {
             color: #007bff;
             font-weight: bold;
-            background-color: #FFFF80; /* ベージュの背景色を追加 */
+            background-color: #F5F5DC; /* ベージュの背景色を追加 */
         }
 
         /* 強調表示のスタイル */
@@ -371,6 +372,9 @@
         const doubleTapThreshold = 300; // ms
         const minSwipeDistance = 30; // pixels
 
+        // NEW: タッチイベントで処理済みであることを示すフラグ
+        let wasTouchHandled = false;
+
         // DOM要素を取得
         const boardElement = document.getElementById('sudoku-board');
         const undoBtn = document.getElementById('undoBtn');
@@ -604,9 +608,10 @@
 
             // 通常のゲームプレイ時のクリック/タップ処理
             if (currentBoard[row][col] !== 0) { // セルに数字が入っている場合 (確定済みセル)
+                console.log(`Debug: handleCellInteraction - Cell (${row}, ${col}) is NOT empty. Value: ${currentBoard[row][col]}, Is initial fixed: ${isInitialFixedCell(row, col)}, isKnownCellsDisabled: ${isKnownCellsDisabled}`);
                 // 「確定済みセルをロック」が有効な場合、編集を許可しない
                 if (isKnownCellsDisabled) {
-                    showMessage("このマスは編集できません。", "info");
+                    showMessage("このマスは編集できません。ロックを解除してください。", "info"); // Added clarification
                     return; 
                 } else {
                     // ロックが無効な場合、確定済みセルをクリア可能にする
@@ -616,6 +621,7 @@
                     showMessage(`セル (${row}, ${col}) の数字がクリアされました。`, "success");
                 }
             } else { // セルが空の場合
+                console.log(`Debug: handleCellInteraction - Cell (${row}, ${col}) is EMPTY. Selected value: ${selectedValue}`);
                 if (selectedValue !== 0) { // 数字が指定されている場合 (タップ/スワイプ/ダブルタップ)
                     const possibleNumbers = getPossibleNumbers(currentBoard, row, col);
                     if (possibleNumbers.includes(selectedValue)) {
@@ -1004,13 +1010,18 @@
         boardElement.addEventListener('touchmove', handleTouchMove, { passive: false });
         boardElement.addEventListener('touchend', handleTouchEnd);
         boardElement.addEventListener('click', (event) => {
-            // タッチイベントで既に処理された場合はクリックイベントを無視
-            if (event.detail === 0) return; // detail === 0 は通常、プログラム的に生成されたクリックイベント
+            // NEW: wasTouchHandled フラグをチェックして、タッチイベントで処理済みであればクリックイベントを無視
+            if (wasTouchHandled) {
+                wasTouchHandled = false; // フラグをリセット
+                event.preventDefault(); // クリックイベントのデフォルト動作も防止
+                return;
+            }
+            // 通常のクリック処理
             const clickedCellElement = event.target.closest('.cell');
             if (!clickedCellElement) return;
             const row = parseInt(clickedCellElement.dataset.row);
             const col = parseInt(clickedCellElement.dataset.col);
-            handleCellInteraction(clickedCellElement, row, col); // 通常のクリック処理
+            handleCellInteraction(clickedCellElement, row, col); 
         });
 
         // 新しく追加したチェックボックスのイベントリスナー
@@ -1030,13 +1041,15 @@
             touchStartY = touch.clientY;
             touchEndTime = 0; 
             lastTappedCell = event.target.closest('.cell'); 
+            // NEW: タッチが始まったら、wasTouchHandledフラグを一旦リセット
+            wasTouchHandled = false; 
         }
 
         /**
          * タッチ移動中の処理
          */
         function handleTouchMove(event) {
-            event.preventDefault();
+            event.preventDefault(); 
         }
 
         /**
@@ -1051,10 +1064,15 @@
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;
             const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            const deltaTime = now - lastTapTime;
 
             const clickedCellElement = event.target.closest('.cell');
-            if (!clickedCellElement) return;
+            if (!clickedCellElement) {
+                event.preventDefault(); 
+                wasTouchHandled = true;
+                lastTapTime = 0; 
+                lastTappedCell = null;
+                return;
+            }
 
             const row = parseInt(clickedCellElement.dataset.row);
             const col = parseInt(clickedCellElement.dataset.col);
@@ -1069,81 +1087,97 @@
                     highlightBtn.textContent = `強調解除 (${num})`;
                     createBoard();
                 }
+                event.preventDefault(); 
+                wasTouchHandled = true; 
                 lastTapTime = 0; 
-                return; 
+                lastTappedCell = null; 
+                return;
             }
 
-            // 空のセルでのみフリック/ダブルタップを処理
-            if (currentBoard[row][col] === 0) {
+            // Logic for empty cells and fixed cells
+            if (currentBoard[row][col] === 0) { // 空のセル
                 const possibleNumbers = getPossibleNumbers(currentBoard, row, col);
 
-                if (distance < minSwipeDistance) { 
-                    // ダブルタップ判定
-                    if (lastTappedCell === clickedCellElement && deltaTime < doubleTapThreshold) {
-                        if (possibleNumbers.includes(5)) {
-                            handleCellInteraction(clickedCellElement, row, col, 5); 
-                            showMessage(`セル (${row}, ${col}) に 5 (ダブルタップ) が確定されました。`, "success");
-                        } else {
-                            showMessage("5 はこのセルには置けません。", "error");
-                        }
-                        lastTapTime = 0; 
-                        lastTappedCell = null;
-                        return;
+                // **ダブルタップ検出を最優先**
+                if (distance < minSwipeDistance && lastTappedCell === clickedCellElement && (now - lastTapTime) < doubleTapThreshold) {
+                    // ダブルタップ確定
+                    const selectedNum = 5;
+                    if (possibleNumbers.includes(selectedNum)) {
+                        handleCellInteraction(clickedCellElement, row, col, selectedNum);
+                        showMessage(`セル (${row}, ${col}) に ${selectedNum} (ダブルタップ) が確定されました。`, "success");
                     } else {
-                        const clickedSubCellElement = event.target.closest('.sub-cell');
-                        if (clickedSubCellElement) {
-                            const valueFromSubCell = parseInt(clickedSubCellElement.dataset.value);
-                            if (clickedSubCellElement.classList.contains('impossible')) {
-                                return;
-                            }
-                            handleCellInteraction(clickedCellElement, row, col, valueFromSubCell);
-                        } else {
-                            showMessage("数字の候補をタップしてください。", "info");
-                        }
+                        showMessage(`${selectedNum} はこのセルには置けません。`, "error");
                     }
-                    lastTapTime = now;
-                    lastTappedCell = clickedCellElement;
-                } else { // スワイプの可能性
-                    lastTapTime = 0; 
+                    event.preventDefault();
+                    wasTouchHandled = true;
+                    lastTapTime = 0; // ダブルタップ処理後、状態をリセット
+                    lastTappedCell = null;
+                    return; // ダブルタップが処理されたらここで終了
+                } 
+                
+                // ダブルタップではなかった場合、シングルタップまたはスワイプのロジックに進む
+                if (distance < minSwipeDistance) { // シングルタップ (ダブルタップのチェックを通過した場合)
+                    const clickedSubCellElement = event.target.closest('.sub-cell');
+                    if (clickedSubCellElement) {
+                        const valueFromSubCell = parseInt(clickedSubCellElement.dataset.value);
+                        if (clickedSubCellElement.classList.contains('impossible')) {
+                            event.preventDefault();
+                            wasTouchHandled = true;
+                            lastTapTime = 0; // 不可能なサブセルタップではダブルタップ状態を設定しない
+                            lastTappedCell = null;
+                            return;
+                        }
+                        handleCellInteraction(clickedCellElement, row, col, valueFromSubCell);
+                        showMessage(`セル (${row}, ${col}) に ${valueFromSubCell} が確定されました。`, "success");
+                        event.preventDefault();
+                        wasTouchHandled = true;
+                        // 有効なサブセルタップの場合のみ、次のダブルタップのために状態を更新
+                        lastTapTime = now; 
+                        lastTappedCell = clickedCellElement;
+                    } else {
+                        // 空のセルの背景をタップした場合（サブセルではない）
+                        showMessage("数字の候補をタップしてください。", "info");
+                        event.preventDefault();
+                        wasTouchHandled = true;
+                        lastTapTime = 0; // 背景タップではダブルタップ状態をリセット
+                        lastTappedCell = null;
+                    }
+                } else { // スワイプ
+                    lastTapTime = 0; // スワイプ後、ダブルタップ状態をリセット
                     lastTappedCell = null;
 
                     const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI; 
-
                     let selectedNum = 0;
-                    // 角度に基づいて数字を決定
-                    if (angle >= -22.5 && angle < 22.5) { // 右
-                        selectedNum = 6;
-                    } else if (angle >= 22.5 && angle < 67.5) { // 右下
-                        selectedNum = 9;
-                    } else if (angle >= 67.5 && angle < 112.5) { // 下
-                        selectedNum = 8;
-                    } else if (angle >= 112.5 && angle < 157.5) { // 左下
-                        selectedNum = 7;
-                    } else if (angle >= 157.5 || angle < -157.5) { // 左
-                        selectedNum = 4;
-                    } else if (angle >= -157.5 && angle < -112.5) { // 左上
-                        selectedNum = 1;
-                    } else if (angle >= -112.5 && angle < -67.5) { // 上
-                        selectedNum = 2;
-                    } else if (angle >= -67.5 && angle < -22.5) { // 右上
-                        selectedNum = 3;
-                    }
+                    // 角度に基づいた数字の選択
+                    if (angle >= -22.5 && angle < 22.5) { selectedNum = 6; }     // 右
+                    else if (angle >= 22.5 && angle < 67.5) { selectedNum = 9; }  // 右下
+                    else if (angle >= 67.5 && angle < 112.5) { selectedNum = 8; } // 下
+                    else if (angle >= 112.5 && angle < 157.5) { selectedNum = 7; } // 左下
+                    else if (angle >= 157.5 || angle < -157.5) { selectedNum = 4; } // 左
+                    else if (angle >= -157.5 && angle < -112.5) { selectedNum = 1; } // 左上
+                    else if (angle >= -112.5 && angle < -67.5) { selectedNum = 2; } // 上
+                    else if (angle >= -67.5 && angle < -22.5) { selectedNum = 3; } // 右上
 
-                    if (selectedNum !== 0 && possibleNumbers.includes(selectedNum)) {
+                    if (selectedNum !== 0 && possibleNumbers.includes(selectedNum)) { 
                         handleCellInteraction(clickedCellElement, row, col, selectedNum);
                         showMessage(`セル (${row}, ${col}) に ${selectedNum} (フリック) が確定されました。`, "success");
                     } else if (selectedNum !== 0) {
                         showMessage(`${selectedNum} はこのセルには置けません。`, "error");
                     }
+                    event.preventDefault();
+                    wasTouchHandled = true;
                 }
-            } else { // 固定されたセルでのタップ
+            } else { // 固定されたセルでのタップ（数字が入っているセル）
+                // 固定セルへのタップでは、ダブルタップの状態は保持しない
                 if (!isKnownCellsDisabled && distance < minSwipeDistance) {
                     handleCellInteraction(clickedCellElement, row, col);
                 } else if (isKnownCellsDisabled && distance < minSwipeDistance) {
                     showMessage("このマスは編集できません。", "info");
                 }
-                lastTapTime = now; 
-                lastTappedCell = clickedCellElement;
+                event.preventDefault();
+                wasTouchHandled = true;
+                lastTapTime = 0; 
+                lastTappedCell = null;
             }
         }
 
