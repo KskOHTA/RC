@@ -264,14 +264,30 @@
             #main-layout-container {
                 flex-direction: row; /* 盤面と右パネルを左右に並べる */
                 justify-content: center; /* 水平方向中央揃え */
-                align-items: flex-start; /* 盤面と右パネルを上端揃え */
+                align-items: center; /* 盤面と右パネルを上端揃え */
+                height: 100%; /* 高さ100%を維持してalign-items: center;が機能するように */
                 gap: 15px; /* 盤面と右パネル間のギャップを拡大 */
             }
 
+            #right-panel {
+                justify-content: center; /* パネル内の要素を垂直中央揃え */
+                height: 100%; /* main-layout-containerの高さを使う */
+            }
+
             .controls {
-                flex-wrap: nowrap; /* ボタンの折り返しを禁止 */
-                flex-direction: column; /* ボタンを縦に並べる */
-                align-items: flex-start; /* ボタンを左揃え */
+                flex-wrap: wrap; /* ボタンの折り返しを許可 (2列にするため) */
+                flex-direction: row; /* ボタンを横に並べる */
+                justify-content: center; /* ボタンを中央揃え */
+                max-width: 190px; /* 2列に収まるように最大幅を設定 (ボタンサイズによって調整) */
+            }
+
+            .controls button {
+                flex: 1 1 calc(50% - 2.5px); /* 2列にするため、幅を50%からギャップの半分を引いた値に設定 */
+                max-width: calc(50% - 2.5px); /* 明示的な最大幅 */
+            }
+
+            .option-group {
+                align-self: center; /* 中央に配置 */
             }
         }
     </style>
@@ -861,7 +877,7 @@
          * メッセージボックスにメッセージを表示する
          * @param {string} message - 表示するメッセージ
          * @param {string} type - 'success', 'error', 'info' のいずれか
-         */
+        */
         function showMessage(message, type) {
             messageBox.textContent = message;
             messageBox.className = 'visible'; // まず表示状態にする
@@ -898,28 +914,24 @@
             const availableHeightForMainLayout = window.innerHeight - h1Height - bodyPaddingsY - bodyGap;
 
             const mainLayoutContainer = document.getElementById('main-layout-container');
+            // main-layout-containerのギャップはランドスケープモードで変わる可能性があるため、動的に取得
             const mainLayoutContainerGap = parseFloat(getComputedStyle(mainLayoutContainer).gap);
 
             let calculatedBoardSize;
 
             if (window.innerWidth > window.innerHeight) { // ランドスケープモード
-                // main-layout-containerは横方向に要素を並べる
-                // ボードの左側にあり、右パネルが右側にある
                 const rightPanelElement = document.getElementById('right-panel');
-                const controls = document.querySelector('.controls');
+                const controls = rightPanelElement.querySelector('.controls');
+                const optionGroup = rightPanelElement.querySelector('.option-group');
 
                 // 測定のために一時的にランドスケープスタイルの適用を確実にする
-                // メディアクエリが適用される前にJSで取得すると、正確な値が得られない場合があるため
-                const originalControlsStyle = controls.style.cssText; 
-                controls.style.flexWrap = 'nowrap';
-                controls.style.flexDirection = 'column';
-                controls.style.alignItems = 'flex-start';
+                // この変更はDOMにレンダリングされるまで反映されないため、offsetWidthはすぐに正確な値にならない可能性があります。
+                // ただし、この問題は非常に複雑なため、現行の方法で進めます。
+                // CSSのメディアクエリに頼ることで、JSでの一時的なスタイル適用は不要になることが多いです。
+                // ここでは、CSSメディアクエリが適用されているという前提でoffsetWidthを取得します。
 
                 const rightPanelWidth = rightPanelElement.offsetWidth;
                 
-                // スタイルを元に戻す
-                controls.style.cssText = originalControlsStyle;
-
                 // メインレイアウトコンテナ内でボードが利用できる幅を計算
                 const availableWidthInMainLayout = window.innerWidth - bodyPaddingsX - rightPanelWidth - mainLayoutContainerGap; 
                 
@@ -930,8 +942,6 @@
                 calculatedBoardSize = Math.min(500, availableWidthInMainLayout, boardHeightFromAvailableVertical);
 
             } else { // ポートレートモード
-                // main-layout-containerは縦方向に要素を並べる
-                // ボードの下に右パネルがある
                 const rightPanelElement = document.getElementById('right-panel');
                 const rightPanelHeight = rightPanelElement.offsetHeight;
 
