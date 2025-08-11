@@ -13,7 +13,7 @@
             flex-direction: column; /* 常時カラム配置: h1が上、main-layout-containerが下 */
             padding: 10px; /* 全体のパディング */
             margin: 0;
-            box-sizing: border-box; /* ここを修正 */
+            box-sizing: border-box;
             gap: 4px; /* 子要素間の垂直方向のスペースをさらに縮小 */
             background-color: #f0f0f0;
             height: 100vh; /* ビューポートの高さ全体を使用 */
@@ -45,7 +45,6 @@
             border-radius: 8px; /* 角を丸くする */
             overflow: hidden; /* 角丸で内容がはみ出さないようにする */
             margin: 0;
-            /* align-self: center; REMOVED: 親のalign-itemsに従うようにする */
         }
 
         .cell {
@@ -265,9 +264,9 @@
         /* ランドスケープモード (横長画面) のスタイル */
         @media (orientation: landscape) {
             body {
-                flex-direction: row; /* MODIFIED: H1とmain-layout-containerを横に並べる */
-                justify-content: flex-start; /* MODIFIED: 全体を水平方向左揃え */
-                align-items: flex-start; /* MODIFIED: H1とmain-layout-containerを垂直方向上揃え */
+                flex-direction: row; /* H1とmain-layout-containerを横に並べる */
+                justify-content: flex-start; /* 全体を水平方向左揃え */
+                align-items: flex-start; /* H1とmain-layout-containerを垂直方向上揃え */
                 gap: 10px; /* H1とmain-layout-containerの間のギャップを調整 */
                 padding: 5px; /* 全体のパディングを少し削減 */
             }
@@ -279,15 +278,15 @@
                 font-size: clamp(20px, 3vw, 28px);
                 flex-shrink: 0;
                 white-space: nowrap;
-                align-self: flex-start; /* NEW: H1を左寄せ */
-                margin-left: 5px; /* NEW: H1に左マージンを追加 (body paddingと揃えるため) */
+                align-self: flex-start; /* H1を左寄せ */
+                margin-left: 5px; /* H1に左マージンを追加 (body paddingと揃えるため) */
             }
 
             #main-layout-container {
                 flex-direction: row; /* 盤面と右パネルを左右に並べる */
                 justify-content: center; /* 水平方向中央揃え */
-                align-items: center; /* 垂直方向中央揃え */
-                height: 100%; /* NEW: 親 (body) の高さを最大限利用 */
+                align-items: flex-start; /* MODIFIED: 垂直方向上揃え */
+                height: 100%; /* 親 (body) の高さを最大限利用 */
                 width: auto;
                 flex-grow: 1; /* 残りの水平スペースを全て使う */
                 gap: 15px; /* 盤面と右パネル間のギャップを拡大 */
@@ -296,7 +295,7 @@
             #right-panel {
                 justify-content: flex-start;
                 height: auto;
-                padding-top: 0; /* ここを修正 */
+                padding-top: 0;
             }
 
             .controls {
