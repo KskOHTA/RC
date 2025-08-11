@@ -10,10 +10,10 @@
             display: flex;
             justify-content: flex-start; /* 上寄せ */
             align-items: center; /* 横方向中央揃え */
-            flex-direction: column;
+            flex-direction: column; /* 常時カラム配置: h1が上、main-layout-containerが下 */
             padding: 10px; /* 全体のパディング */
             margin: 0;
-            box-sizing: border;
+            box-sizing: border-box; /* ここを修正 */
             gap: 4px; /* 子要素間の垂直方向のスペースをさらに縮小 */
             background-color: #f0f0f0;
             height: 100vh; /* ビューポートの高さ全体を使用 */
@@ -265,55 +265,57 @@
         /* ランドスケープモード (横長画面) のスタイル */
         @media (orientation: landscape) {
             body {
-                flex-direction: row; /* h1 と main-layout-container を横に並べる */
-                justify-content: flex-start; /* 全体を水平方向左揃え */
-                align-items: flex-start; /* h1 と main-layout-container を垂直方向上揃え */
-                gap: 10px; /* h1 と main-layout-container の間のギャップを調整 */
+                flex-direction: row; /* MODIFIED: H1とmain-layout-containerを横に並べる */
+                justify-content: flex-start; /* MODIFIED: 全体を水平方向左揃え */
+                align-items: flex-start; /* MODIFIED: H1とmain-layout-containerを垂直方向上揃え */
+                gap: 10px; /* H1とmain-layout-containerの間のギャップを調整 */
                 padding: 5px; /* 全体のパディングを少し削減 */
             }
 
             h1 {
-                padding: 0; /* パディングをゼロにする */
-                margin: 0; /* マージンをゼロにする */
-                line-height: 1em; /* 行の高さを制御し、スペースを削減 */
-                font-size: clamp(20px, 3vw, 28px); /* 少し小さめのフォントサイズに調整 */
-                flex-shrink: 0; /* h1 は縮まないようにする */
-                white-space: nowrap; /* テキストの折り返しを防ぐ */
+                padding: 0;
+                margin: 0;
+                line-height: 1em;
+                font-size: clamp(20px, 3vw, 28px);
+                flex-shrink: 0;
+                white-space: nowrap;
+                align-self: flex-start; /* NEW: H1を左寄せ */
+                margin-left: 5px; /* NEW: H1に左マージンを追加 (body paddingと揃えるため) */
             }
 
             #main-layout-container {
                 flex-direction: row; /* 盤面と右パネルを左右に並べる */
                 justify-content: center; /* 水平方向中央揃え */
-                align-items: flex-start; /* MODIFIED: 盤面と右パネルを垂直方向上揃え */
-                height: 100%; /* 親 (body) の高さを最大限利用 */
-                width: auto; /* 幅はコンテンツと利用可能なスペースによって決まる */
+                align-items: center; /* 垂直方向中央揃え */
+                height: 100%; /* NEW: 親 (body) の高さを最大限利用 */
+                width: auto;
                 flex-grow: 1; /* 残りの水平スペースを全て使う */
                 gap: 15px; /* 盤面と右パネル間のギャップを拡大 */
             }
 
             #right-panel {
-                justify-content: flex-start; /* パネル内の要素を垂直方向上揃え */
-                height: auto; /* 高さ100%の代わりにコンテンツの高さに合わせる */
-                padding-top: 5px; /* ボードの上端と揃えるための小さなパディング */
+                justify-content: flex-start;
+                height: auto;
+                padding-top: 0; /* ここを修正 */
             }
 
             .controls {
-                flex-wrap: wrap; /* ボタンの折り返しを許可 (2列にするため) */
-                flex-direction: row; /* ボタンを横に並べる */
-                justify-content: center; /* ボタンを中央揃え */
-                max-width: 280px; /* 調整された最大幅 (ボタンのキャプションが収まるように) */
-                gap: 8px; /* ボタン間のギャップを少し拡大 */
+                flex-wrap: wrap;
+                flex-direction: row;
+                justify-content: center;
+                max-width: 280px;
+                gap: 8px;
             }
 
             .controls button {
-                flex: 1 1 calc(50% - 4px); /* 2列にするため、幅を50%からギャップの半分を引いた値に設定 */
-                max-width: calc(50% - 4px); /* 明示的な最大幅 */
-                padding: 8px 10px; /* パディングを調整してボタンのサイズを適切に保つ */
-                font-size: 13px; /* フォントサイズを調整 */
+                flex: 1 1 calc(50% - 4px);
+                max-width: calc(50% - 4px);
+                padding: 8px 10px;
+                font-size: 13px;
             }
 
             .option-group {
-                align-self: flex-start; /* チェックボックスを上揃え */
+                align-self: flex-start;
             }
         }
     </style>
@@ -948,28 +950,27 @@
             let calculatedBoardSize;
 
             if (window.innerWidth > window.innerHeight) { // ランドスケープモード
-                const h1Width = h1Element.offsetWidth; // h1の幅を取得
-                const rightPanelWidth = rightPanelElement.offsetWidth; // 右パネルの幅を取得
-                const mainLayoutContainerGap = parseFloat(getComputedStyle(mainLayoutContainer).gap); // main-layout-container内のギャップ
-                const bodyGap = parseFloat(computedBodyStyle.gap); // body内のギャップ（h1とmain-layout-containerの間）
+                const h1Height = h1Element.offsetHeight; // h1の高さ
+                const rightPanelWidth = rightPanelElement.offsetWidth; // 右パネルの幅
+                const bodyGap = parseFloat(computedBodyStyle.gap); // body内のギャップ (h1とmain-layout-containerの間)
+                const mainLayoutContainerGap = parseFloat(getComputedStyle(mainLayoutContainer).gap); // main-layout-container内のギャップ (ボードと右パネルの間)
+
+                // 盤面が利用できる垂直方向のスペースを計算
+                // bodyがflex-direction: rowなので、h1の高さはmain-layout-containerの垂直スペースから引かれない
+                const availableVerticalSpaceForBoard = window.innerHeight 
+                                                            - bodyPaddingTop 
+                                                            - bodyPaddingBottom;
 
                 // 盤面が利用できる水平方向のスペースを計算
-                // ウィンドウの幅 - (body左右パディング) - h1の幅 - (h1とmain-layout-container間のギャップ) - 右パネルの幅 - (ボードと右パネル間のギャップ)
                 const availableWidthForBoard = window.innerWidth
                                              - bodyPaddingLeft
                                              - bodyPaddingRight
-                                             - h1Width
-                                             - bodyGap 
+                                             - h1Element.offsetWidth // H1の幅を引く
+                                             - bodyGap             // H1とメインコンテナ間のギャップを引く
                                              - rightPanelWidth
-                                             - mainLayoutContainerGap;
-                
-                // 盤面が利用できる垂直方向のスペースを計算 (bodyの上下パディングのみを考慮)
-                // h1は横並びのため、垂直方向のスペース計算には含めない
-                const availableHeightForBoard = window.innerHeight - bodyPaddingTop - bodyPaddingBottom;
+                                             - mainLayoutContainerGap; // horizontal space for board, considering right panel and its gap
 
-
-                // 最終的なボードサイズは、最大500px、利用可能な幅、利用可能な高さのうち最も小さい値
-                calculatedBoardSize = Math.min(500, availableWidthForBoard, availableHeightForBoard);
+                calculatedBoardSize = Math.min(500, availableWidthForBoard, availableVerticalSpaceForBoard);
 
             } else { // ポートレートモード
                 const h1Height = h1Element.offsetHeight; // h1の高さ
