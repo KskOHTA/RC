@@ -266,7 +266,7 @@
             body {
                 flex-direction: row; /* H1とmain-layout-containerを横に並べる */
                 justify-content: flex-start; /* 全体を水平方向左揃え */
-                align-items: flex-start; /* H1とmain-layout-containerを垂直方向上揃え */
+                align-items: stretch; /* MODIFIED: 子供を垂直方向に引き伸ばす */
                 gap: 10px; /* H1とmain-layout-containerの間のギャップを調整 */
                 padding: 5px; /* 全体のパディングを少し削減 */
             }
@@ -278,14 +278,14 @@
                 font-size: clamp(20px, 3vw, 28px);
                 flex-shrink: 0;
                 white-space: nowrap;
-                align-self: flex-start; /* H1を左寄せ */
+                align-self: flex-start; /* H1を左寄せ（親のstretchを上書き） */
                 margin-left: 5px; /* H1に左マージンを追加 (body paddingと揃えるため) */
             }
 
             #main-layout-container {
                 flex-direction: row; /* 盤面と右パネルを左右に並べる */
                 justify-content: center; /* 水平方向中央揃え */
-                align-items: flex-start; /* MODIFIED: 垂直方向上揃え */
+                align-items: flex-start; /* 垂直方向上揃え */
                 height: 100%; /* 親 (body) の高さを最大限利用 */
                 width: auto;
                 flex-grow: 1; /* 残りの水平スペースを全て使う */
@@ -948,7 +948,7 @@
 
             let calculatedBoardSize;
 
-            if (window.innerWidth > window.innerHeight) { // ランドスケープモード
+            if (document.documentElement.clientWidth > document.documentElement.clientHeight) { // ランドスケープモード
                 const h1Height = h1Element.offsetHeight; // h1の高さ
                 const rightPanelWidth = rightPanelElement.offsetWidth; // 右パネルの幅
                 const bodyGap = parseFloat(computedBodyStyle.gap); // body内のギャップ (h1とmain-layout-containerの間)
@@ -956,12 +956,12 @@
 
                 // 盤面が利用できる垂直方向のスペースを計算
                 // bodyがflex-direction: rowなので、h1の高さはmain-layout-containerの垂直スペースから引かれない
-                const availableVerticalSpaceForBoard = window.innerHeight 
+                const availableVerticalSpaceForBoard = document.documentElement.clientHeight 
                                                             - bodyPaddingTop 
                                                             - bodyPaddingBottom;
 
                 // 盤面が利用できる水平方向のスペースを計算
-                const availableWidthForBoard = window.innerWidth
+                const availableWidthForBoard = document.documentElement.clientWidth
                                              - bodyPaddingLeft
                                              - bodyPaddingRight
                                              - h1Element.offsetWidth // H1の幅を引く
@@ -980,10 +980,10 @@
                 // 固定UI要素（h1, 右パネル, bodyパディング, bodyギャップ, main-layout-containerギャップ）が消費する合計垂直スペース
                 const totalFixedUIHeight = h1Height + bodyPaddingTop + bodyPaddingBottom + bodyGap + rightPanelHeight + mainLayoutContainerGap; 
                 
-                const availableWidthInMainLayout = window.innerWidth - bodyPaddingLeft - bodyPaddingRight;
+                const availableWidthInMainLayout = document.documentElement.clientWidth - bodyPaddingLeft - bodyPaddingRight;
                 
                 // 最終的なボードサイズは、最大500px、利用可能な幅、残りの垂直スペースのうち最も小さい値
-                calculatedBoardSize = Math.min(500, availableWidthInMainLayout, window.innerHeight - totalFixedUIHeight);
+                calculatedBoardSize = Math.min(500, availableWidthInMainLayout, document.documentElement.clientHeight - totalFixedUIHeight);
             }
             
             // サブピクセルレンダリングの問題を避けるため、最終的なボードサイズを整数に切り捨て
